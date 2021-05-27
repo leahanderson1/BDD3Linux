@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 cvar_t	cl_nopext = {"cl_nopext","0",CVAR_NONE};	//Spike -- prevent autodetection of protocol extensions, so that servers fall back to only their base protocol (without needing to reconfigure the server. Requires reconnect.
 cvar_t	cmd_warncmd = {"cl_warncmd","1",CVAR_NONE};	//Spike -- prevent autodetection of protocol extensions, so that servers fall back to only their base protocol (without needing to reconfigure the server. Requires reconnect.
+cvar_t	cl_aliasoverlap = {"cl_aliasoverlap","1",CVAR_NONE}; //Spike -- Rename new aliases if they would override cvar names.
+
 void Cmd_ForwardToServer (void);
 
 #define	MAX_ALIAS_NAME	32
@@ -354,7 +356,7 @@ void Cmd_Alias_f (void)
 {
 	cmdalias_t	*a;
 	char		cmd[1024];
-	int			i, c, count = 0;; // woods #search
+	int			i, c, count = 0; // woods #search
 	const char	*s;
 	qboolean found = false; // woods #search
 
@@ -415,10 +417,27 @@ void Cmd_Alias_f (void)
 			return;
 		}
 
+		// check for overlap with a command
+		// commands always take precedence over aliases (so mods can't clobber 'quit' etc), 
+		// so creating an alias with one of these names is stupid. always try to rename them.
+		char final_name[MAX_ALIAS_NAME];
+		q_strlcpy(final_name, s, sizeof(final_name));
+		if (Cmd_Exists(s) || (!cl_aliasoverlap.value && Cvar_FindVar(s)))
+		{ //aliases take precedence over cvars (while cvars can be set via 'set'), so user's choice.
+			// Append "_a" to conflicting names
+			if (q_strlcat(final_name, "_a", sizeof(final_name)) >= sizeof(final_name))
+			{
+				Con_Printf("Alias name would be too long after renaming\n");
+				return;
+			}
+			Con_Printf("alias ^m%s^m: renamed to ^m%s^m due to %s conflict\n",
+				s, final_name, Cmd_Exists(s) ? "command" : "cvar");
+		}
+
 		// if the alias already exists, reuse it
 		for (a = cmd_alias ; a ; a=a->next)
 		{
-			if (!strcmp(s, a->name))
+			if (!strcmp(final_name, a->name))
 			{
 				Z_Free (a->value);
 				break;
@@ -431,7 +450,7 @@ void Cmd_Alias_f (void)
 			a->next = cmd_alias;
 			cmd_alias = a;
 		}
-		strcpy (a->name, s);
+		strcpy (a->name, final_name);
 
 		// copy the rest of the command line
 		cmd[0] = 0;		// start out with a null string
@@ -1209,6 +1228,7 @@ void Cmd_Init (void)
 
 	Cvar_RegisterVariable (&cl_nopext);
 	Cvar_RegisterVariable (&cmd_warncmd);
+	Cvar_RegisterVariable (&cl_aliasoverlap);
 }
 
 /*
