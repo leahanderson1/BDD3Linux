@@ -825,6 +825,54 @@ void GL_CreateSurfaceLightmap (qmodel_t *model, msurface_t *surf)
 	R_BuildLightMap (model, surf, base, LMBLOCK_WIDTH*lightmap_bytes, currententity, r_framecount, cl_dlights);
 }
 
+#ifdef MACBOOK_ARM_HACK // ezquake 22f39e2 by nano -- woods #collinear
+#define EPSILON 1e-6
+
+// Check if triangle has a ~zero area
+// https://en.wikipedia.org/wiki/Collinearity
+static qboolean R_ArePointsColinear(const vec3_t v1, const vec3_t v2, const vec3_t v3)
+{
+	vec3_t d0, d1, cross;
+
+	VectorSubtract(v2, v1, d0);
+	VectorSubtract(v3, v2, d1);
+
+	CrossProduct(d0, d1, cross);
+
+	return DotProduct(cross, cross) < EPSILON;
+}
+
+static void R_RemoveColinearVertices(glpoly_t* poly, float new_verts[][VERTEXSIZE])
+{
+	int i, v1_index, v2_index, v3_index, new_numverts = 0;
+	int numverts = poly->numverts;
+
+	v1_index = numverts - 1;
+	v2_index = 0;
+	v3_index = 1;
+
+	for (i = 0; i < numverts; i++) {
+		float* v1 = poly->verts[v1_index];
+		float* v2 = poly->verts[v2_index];
+		float* v3 = poly->verts[v3_index];
+
+		if (!R_ArePointsColinear(v1, v2, v3)) {
+			memcpy(new_verts[new_numverts], v2, sizeof(float) * VERTEXSIZE);
+			new_numverts++;
+		}
+
+		v1_index = v2_index;
+		v2_index = v3_index;
+		v3_index = (v3_index + 1) % numverts;
+	}
+
+	if (new_numverts > 0) {
+		memcpy(poly->verts, new_verts, new_numverts * sizeof(float) * VERTEXSIZE);
+		poly->numverts = new_numverts;
+	}
+}
+#endif
+
 /*
 ================
 BuildSurfaceDisplayList -- called at level load time
@@ -832,6 +880,9 @@ BuildSurfaceDisplayList -- called at level load time
 */
 static void BuildSurfaceDisplayList (msurface_t *fa)
 {
+#ifdef MACBOOK_ARM_HACK // woods #collinear
+	extern cvar_t r_remove_collinear_vertices;
+#endif
 	int			i, lindex, lnumverts;
 	medge_t		*pedges, *r_pedge;
 	float		*vec;
@@ -911,6 +962,20 @@ static void BuildSurfaceDisplayList (msurface_t *fa)
 
 	poly->numverts = lnumverts;
 
+#ifdef MACBOOK_ARM_HACK // woods #collinear
+	// Some GPUs misbehave if fed triangles of empty size.
+	if (r_remove_collinear_vertices.value) {
+		if (poly->numverts > 4) {
+			float (*new_verts)[VERTEXSIZE] = Q_malloc(poly->numverts * sizeof(float[VERTEXSIZE]));
+			R_RemoveColinearVertices(poly, new_verts);
+			free(new_verts);
+		}
+		else {
+			float new_verts[4][VERTEXSIZE];
+			R_RemoveColinearVertices(poly, new_verts);
+		}
+	}
+#endif
 	//oldwater is lame. subdivide it now.
 	if ((fa->flags & SURF_DRAWTURB) && !gl_glsl_water_able)
 		GL_SubdivideSurface (fa);

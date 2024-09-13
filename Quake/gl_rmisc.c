@@ -48,6 +48,10 @@ extern cvar_t r_nolerp_list;
 extern cvar_t r_noshadow_list;
 extern cvar_t r_nooutline_list; // woods #routline
 extern cvar_t r_outline; // woods #routline
+#ifdef MACBOOK_ARM_HACK // woods #collinear
+extern cvar_t r_remove_collinear_vertices;
+#endif
+
 //johnfitz
 extern cvar_t r_scenecache;
 extern cvar_t gl_zfix; // QuakeSpasm z-fighting fix
@@ -363,6 +367,9 @@ void R_Init (void)
 	Cvar_SetCallback (&r_noshadow_list, R_Model_ExtraFlags_List_f);
 	Cvar_RegisterVariable(&r_nooutline_list); // woods #routline
 	Cvar_RegisterVariable(&r_outline); // woods #routline
+#ifdef MACBOOK_ARM_HACK // woods #collinear
+	Cvar_RegisterVariable (&r_remove_collinear_vertices);
+#endif
 	//johnfitz
 	//spike -- new cvars...
 	Cvar_RegisterVariable (&r_scenecache);

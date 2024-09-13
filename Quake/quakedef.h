@@ -276,6 +276,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define	SERVERLIST	"servers.txt"	// woods for server history + tab complete #serverlist
 #define	BOOKMARKSLIST	"bookmarks.txt"	// woods #bookmarksmenu
 
+#if defined(__APPLE__) && defined(__aarch64__)
+#define MACBOOK_ARM_HACK // woods #collinear
+#endif
+
 typedef struct
 {
 	const char *basedir;
