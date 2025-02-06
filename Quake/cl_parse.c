@@ -1511,10 +1511,6 @@ static void CL_ParseServerInfo (void)
 		Con_Printf ("\n");
 	Con_Printf ("Using protocol %s\n", protname);
 
-	// seperate the printfs so the server message can have a color
-	Con_Printf ("\n%s\n", Con_Quakebar(40)); //johnfitz
-	Con_Printf ("%c%s\n", 2, str);
-
 // first we go through and touch all of the precache data that still
 // happens to be in the cache, so precaching something else doesn't
 // needlessly purge it
@@ -1598,6 +1594,13 @@ static void CL_ParseServerInfo (void)
 
 	// copy the naked name of the map file to the cl structure -- O.S
 	COM_StripExtension (COM_SkipPath(cl.model_name[1]), cl.mapname, sizeof(cl.mapname));
+
+	if (cl.levelname[0] == '\0')
+		q_strlcpy(cl.levelname, cl.mapname, sizeof cl.levelname);
+
+	// seperate the printfs so the server message can have a color
+	Con_Printf ("\n%s\n", Con_Quakebar(40)); //johnfitz
+	Con_Printf ("%c%s\n", 2, cl.levelname);
 
 	//johnfitz -- clear out string; we don't consider identical
 	//messages to be duplicates if the map has changed in between
