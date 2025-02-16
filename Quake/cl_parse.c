@@ -2425,7 +2425,9 @@ qboolean CL_ParseProQuakeString(const char* string) // #pqteam
 		spectator = Info_GetKey(cl.scores[cl.realviewentity - 1].userinfo, "*spectator", buf4, sizeof(buf4)); // woods #autovote
 	}
 
-	if ((!q_strcasecmp(observer, "off") || !q_strcasecmp(star_observer, "off")) && !q_strcasecmp(observing, "off")) // use info keys to detect
+	if ((!q_strcasecmp(observer, "off") || observer[0] == '\0' ||
+		!q_strcasecmp(star_observer, "off") || star_observer[0] == '\0') &&
+		(!q_strcasecmp(observing, "off") || observing[0] == '\0')) // use info keys to detect
 		cl.notobserver = 1;
 	else
 		cl.notobserver = 0;
