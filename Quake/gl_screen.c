@@ -2067,6 +2067,50 @@ void SCR_ShowFlagStatus(void)
 		}
 }
 
+// woods #speed #speedometer
+
+#define SPEED_UPDATE_INTERVAL 0.167f
+static float last_speed = 0;
+static float current_speed = 0;
+static float speed_update_time = 0;
+
+static float GetLocalVelocity(void)
+{
+	vec3_t vel;
+
+	vel[0] = cl.velocity[0];
+	vel[1] = cl.velocity[1];
+	vel[2] = 0;
+
+	return VectorLength(vel);
+}
+
+static float GetSpeedValue(void)
+{
+	if (cl.modtype == 1 && !cl.notobserver &&
+		cl.viewentity - 1 >= 0 && cl.viewentity - 1 < MAX_SCOREBOARD)
+	{
+		int new_speed = (int)cl.scores[cl.viewentity - 1].tinfo.speed;
+
+		if (new_speed != 0)  // Check if speed data exists
+		{
+			// If we got a new speed update
+			if (new_speed != current_speed)
+			{
+				last_speed = current_speed;
+				current_speed = new_speed;
+				speed_update_time = cl.time;
+			}
+
+			// Interpolate between last and current speed
+			float frac = (cl.time - speed_update_time) / SPEED_UPDATE_INTERVAL;
+			frac = CLAMP(0, frac, 1);
+			return last_speed + (current_speed - last_speed) * frac;
+		}
+	}
+	return GetLocalVelocity();
+}
+
 /*
 ==============
 SCR_Speedometer -- woods #speedometer (https://github.com/matthewearl/quakespasm f4411f0 from joequake)
@@ -2098,9 +2142,7 @@ void SCR_Speedometer(void)
 		maxspeed = 0;
 	}
 
-	VectorCopy(cl.velocity, vel);
-	vel[2] = 0;
-	speed = VectorLength(vel);
+	speed = GetSpeedValue();
 
 	if (speed > maxspeed)
 		maxspeed = speed;
@@ -2153,9 +2195,16 @@ SCR_DrawSpeed -- woods #speed
 */
 void SCR_DrawSpeed (void)
 {
+	if (scr_showspeed.value > 1)
+	{
+		SCR_Speedometer();
+		return;
+	}
+	
 	char			st[64];
 	int				x, y;
 	int				clampedSbar = CLAMP(1, (int)scr_sbar.value, 3);
+	float			speed = 0;
 
 	if (scr_viewsize.value > 110 || scr_viewsize.value >= 130)
 		return;
@@ -2180,9 +2229,9 @@ void SCR_DrawSpeed (void)
 			y = 233;
 	}
 
-	if (scr_showspeed.value == 1 && !cl.intermission) {
-		vec3_t	vel = { cl.velocity[0], cl.velocity[1], 0 };
-		float	speed = VectorLength(vel);
+	if (scr_showspeed.value == 1 && (!cl.intermission || !qeintermission || !crxintermission))
+	{
+		speed = GetSpeedValue();
 
 	sprintf(st, "%-3.0f", speed);
 	if (scr_viewsize.value <= 110)
@@ -2195,10 +2244,6 @@ void SCR_DrawSpeed (void)
 					M_PrintWhite(x, y, st);  // white
 		}
 	}
-
-	if (scr_showspeed.value > 1)
-		SCR_Speedometer (); // woods #speedometer
-
 }
 
 /*
