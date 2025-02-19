@@ -655,9 +655,9 @@ void Sbar_SoloScoreboard (void)
 			char qfylwdot[2] = { 133, '\0' }; // woods  -- quake font yellow dot
 
 			if (cl.levelname[0]) // if there's a level name
-				q_snprintf(str, sizeof(str), "%s (%s) %s %s", cl.levelname, cl.mapname, qfylwdot, lastmphost);
+				q_snprintf(str, sizeof(str), "%s (%s) %s %s ", cl.levelname, cl.mapname, qfylwdot, lastmphost);
 			else
-				q_snprintf(str, sizeof(str), "%s %s %s", cl.mapname, qfylwdot, lastmphost);
+				q_snprintf(str, sizeof(str), "%s %s %s ", cl.mapname, qfylwdot, lastmphost);
 		}
 		else
 		{ 
