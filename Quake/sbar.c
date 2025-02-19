@@ -1478,97 +1478,179 @@ void Sbar_DrawRecord(void)
 
 /*
 ===============
+Powerup overlays on the HUD face that fade from top to bottom as time expires. woods -- #powerupbars
+Each powerup has its own colored overlay (blue for quad, red for pent, white for ring)
+that blend together when multiple powerups are active. Let's obsevers know how much powerup time left
+===============
+*/
+
+#define POWERUP_DURATION 30.5
+#define SEGMENTS 24        // Number of segments (same as height)
+#define SEGMENT_TIME (POWERUP_DURATION / SEGMENTS)  // Time per segment
+
+static void UpdatePowerupTime (int current_items, int previous_items, int item_flag,
+	const char* timer_name, double* time_var,
+	const struct itemtimer_s* timers, float time_window)
+	{
+	if (current_items & item_flag)
+	{
+		if (!(previous_items & item_flag))
+		{
+			// Find the most recent timer for this powerup
+			double newest_time = 0;
+			for (const struct itemtimer_s* timer = timers; timer; timer = timer->next)
+			{
+				if (!strcmp(timer->timername, timer_name) &&
+					(cl.time - timer->start) <= POWERUP_DURATION)
+				{
+					if (timer->start > newest_time)
+						newest_time = timer->start;
+				}
+			}
+
+			// Use the existing timer if found, otherwise use current time
+			*time_var = newest_time > 0 ? newest_time : cl.time;
+		}
+		else if (*time_var > 0)
+		{
+			// ... existing refresh check code ...
+			for (const struct itemtimer_s* timer = timers; timer; timer = timer->next)
+			{
+				if (!strcmp(timer->timername, timer_name) &&
+					(cl.time - timer->start) <= time_window)
+				{
+					*time_var = timer->start;
+					break;
+		}
+			}
+		}
+	}
+		else
+		{
+		*time_var = 0;
+		}
+	}
+
+void Sbar_PowerupChanged (void)
+	{
+	int playernum = cl.viewentity - 1;
+	if (playernum < 0 || playernum >= MAX_SCOREBOARD)
+		return;
+
+	const float TIME_WINDOW = 20.0f / 72.0f;
+	scoreboard_t* player = &cl.scores[playernum];
+	static int previous_items = 0;
+
+	// Update each powerup
+	UpdatePowerupTime(player->tinfo.items, previous_items, IT_QUAD, "quad",
+		&player->tinfo.quad_time, cl.itemtimers, TIME_WINDOW);
+
+	UpdatePowerupTime(player->tinfo.items, previous_items, IT_INVULNERABILITY, "pent",
+		&player->tinfo.pent_time, cl.itemtimers, TIME_WINDOW);
+
+	UpdatePowerupTime(player->tinfo.items, previous_items, IT_INVISIBILITY, "ring",
+		&player->tinfo.ring_time, cl.itemtimers, TIME_WINDOW);
+
+	previous_items = player->tinfo.items;
+	}
+
+static void Draw_PowerupSegments(int x, int y, double start_time, float alpha,
+	const char* color_str)
+	{
+	float elapsed = cl.time - start_time;
+	if (elapsed <= POWERUP_DURATION) {
+		float segment_height = 24.0f / SEGMENTS;
+		int current_segment = (int)(elapsed / SEGMENT_TIME);
+		float segment_elapsed = fmod(elapsed, SEGMENT_TIME);
+
+		for (int i = current_segment; i < SEGMENTS; i++) {
+			float fade_alpha = (i == current_segment)
+				? alpha * (1.0 - (segment_elapsed / SEGMENT_TIME))
+				: alpha;
+
+			Draw_FillPlayer(x,
+				y + (i * segment_height),
+				24,
+				ceil(segment_height),
+				CL_PLColours_Parse(color_str),
+				fade_alpha);
+	}
+	}
+}
+
+static void Draw_PowerupOverlays(int x, int y)
+	{
+	float ring_alpha = 0.25;
+	float base_alpha = 0.4;
+
+	int playernum = cl.viewentity - 1;
+	if (playernum < 0 || playernum >= MAX_SCOREBOARD)
+		return;
+
+	scoreboard_t* player = &cl.scores[playernum];
+
+	// Draw powerup overlays in order: ring (white), pent (red), quad (blue)
+	if (player->tinfo.ring_time > 0)
+		Draw_PowerupSegments(x, y, player->tinfo.ring_time, ring_alpha, "0xFFFFFF");
+
+	if (player->tinfo.pent_time > 0)
+		Draw_PowerupSegments(x, y, player->tinfo.pent_time, base_alpha, "0xb00000");
+
+	if (player->tinfo.quad_time > 0)
+		Draw_PowerupSegments(x, y, player->tinfo.quad_time, base_alpha, "0x0202cf");
+	}
+
+/*
+===============
 Sbar_DrawFace
 ===============
 */
 void Sbar_DrawFace (void)
 {
-	int	f, anim;
-	plcolour_t color = CL_PLColours_Parse(cl_damagehuecolor.string);
+	int f;
+	qpic_t* face_pic;
 
-// PGM 01/19/97 - team color drawing
-// PGM 03/02/97 - fixed so color swatch only appears in CTF modes
-	if (rogue && (cl.maxclients != 1) && (teamplay.value>3) && (teamplay.value<7))
-	{
-		int	xofs;
-		char	num[12];
-		scoreboard_t	*s;
+	// Call our powerup state change function
+	Sbar_PowerupChanged();
 
-		s = &cl.scores[cl.viewentity - 1];
-		// draw background
-		if (cl.gametype == GAME_DEATHMATCH)
-			xofs = 113;
-		else
-			xofs = ((vid.width - 320)>>1) + 113;
-
-		Sbar_DrawPic (112, 0, rsb_teambord);
-		Draw_FillPlayer (xofs, /*vid.height-*/24+3, 22, 9, s->shirt, 1); //johnfitz -- sbar coords are now relative
-		Draw_FillPlayer (xofs, /*vid.height-*/24+12, 22, 9, s->pants, 1); //johnfitz -- sbar coords are now relative
-
-		// draw number
-		f = s->frags;
-		sprintf (num, "%3i",f);
-
-		if (s->shirt.type == 1 && s->shirt.basic == 0) //white team. FIXME: vanilla says top, but I suspect it should be the lower colour, as that's the actual team nq sees.
-		{
-			if (num[0] != ' ')
-				Sbar_DrawCharacter(113, 3, 18 + num[0] - '0');
-			if (num[1] != ' ')
-				Sbar_DrawCharacter(120, 3, 18 + num[1] - '0');
-			if (num[2] != ' ')
-				Sbar_DrawCharacter(127, 3, 18 + num[2] - '0');
-		}
-		else
-		{
-			Sbar_DrawCharacter (113, 3, num[0]);
-			Sbar_DrawCharacter (120, 3, num[1]);
-			Sbar_DrawCharacter (127, 3, num[2]);
-		}
-
-		return;
-	}
-// PGM 01/19/97 - team color drawing
-
-	if ((cl.items & (IT_INVISIBILITY | IT_INVULNERABILITY))
-			== (IT_INVISIBILITY | IT_INVULNERABILITY))
-	{
-		Sbar_DrawPic (112, 0, sb_face_invis_invuln);
-		return;
-	}
-	if (cl.items & IT_QUAD)
-	{
-		Sbar_DrawPic (112, 0, sb_face_quad );
-		return;
-	}
-	if (cl.items & IT_INVISIBILITY)
-	{
-		Sbar_DrawPic (112, 0, sb_face_invis );
-		return;
-	}
-	if (cl.items & IT_INVULNERABILITY)
-	{
-		Sbar_DrawPic (112, 0, sb_face_invuln);
-		return;
-	}
-
-	if (cl.stats[STAT_HEALTH] >= 100)
-		f = 4;
+	// Determine which face pic to use based on powerups and health
+	if ((cl.items & (IT_INVISIBILITY | IT_INVULNERABILITY)) == (IT_INVISIBILITY | IT_INVULNERABILITY))
+		face_pic = sb_face_invis_invuln;
+	else if (cl.items & IT_QUAD)
+		face_pic = sb_face_quad;
+	else if (cl.items & IT_INVISIBILITY)
+		face_pic = sb_face_invis;
+	else if (cl.items & IT_INVULNERABILITY)
+		face_pic = sb_face_invuln;
 	else
+	{
+		// Regular face selection based on health
 		f = cl.stats[STAT_HEALTH] / 20;
-	if (f < 0)	// in case we ever decide to draw when health <= 0
-		f = 0;
+		f = bound(0, f, 4);
 
 	if (cl.time <= cl.faceanimtime)
-	{
-		anim = 1;
-		sb_updates = 0;		// make sure the anim gets drawn over
+			face_pic = sb_faces[f][1];
+		else
+			face_pic = sb_faces[f][0];
 	}
-	else
-		anim = 0;
-	Sbar_DrawPic (112, 0, sb_faces[f][anim]);
 
-	if (cl.time <= cl.faceanimtime && cl_damagehue.value && cl_damagehuecolor.value) // woods for damagehue on sbar face
- 		Draw_FillPlayer(112, 24, 24, 25, color, .2);
+	// Draw the base face
+	Sbar_DrawPic(112, 0, face_pic);
+
+	// Handle damage hue first (highest priority)
+	if (cl.time <= cl.faceanimtime && cl_damagehue.value && cl_damagehuecolor.value)
+	{
+		plcolour_t color = CL_PLColours_Parse(cl_damagehuecolor.string);
+		Draw_FillPlayer(112, 24, 24, 24, color, 0.2);
+		return;
+	}
+
+	if (cl.modtype == 1 && !cl.notobserver)  // if we ARE an observer
+	{
+		int playernum = cl.viewentity - 1;
+		if (playernum >= 0 && playernum < MAX_SCOREBOARD)
+			Draw_PowerupOverlays(112, 24);
+}
 }
 
 /*
@@ -1644,26 +1726,27 @@ static void Sbar_Voice(int y)
 
 /*
 ===============
-Sbar_FacePic - woods fpr qe sbar #qehud
+Sbar_FacePic - woods for qe sbar #qehud #powerupbars #damage
 ===============
 */
 static qpic_t* Sbar_FacePic(void)
 {
 	int f, anim;
+	qpic_t* face_pic;
+
+	Sbar_PowerupChanged();
 
 	if ((cl.items & (IT_INVISIBILITY | IT_INVULNERABILITY))
 		== (IT_INVISIBILITY | IT_INVULNERABILITY))
-		return sb_face_invis_invuln;
-
-	if (cl.items & IT_QUAD)
-		return sb_face_quad;
-
-	if (cl.items & IT_INVISIBILITY)
-		return sb_face_invis;
-
-	if (cl.items & IT_INVULNERABILITY)
-		return sb_face_invuln;
-
+		face_pic = sb_face_invis_invuln;
+	else if (cl.items & IT_QUAD)
+		face_pic = sb_face_quad;
+	else if (cl.items & IT_INVISIBILITY)
+		face_pic = sb_face_invis;
+	else if (cl.items & IT_INVULNERABILITY)
+		face_pic = sb_face_invuln;
+	else
+	{
 	if (cl.stats[STAT_HEALTH] >= 100)
 		f = 4;
 	else
@@ -1679,7 +1762,23 @@ static qpic_t* Sbar_FacePic(void)
 	else
 		anim = 0;
 
-	return sb_faces[f][anim];
+		face_pic = sb_faces[f][anim];
+	}
+
+	Sbar_DrawPic(18, 140, face_pic);
+
+	// Handle damage hue first (highest priority)
+	if (cl.time <= cl.faceanimtime && cl_damagehue.value && cl_damagehuecolor.value)
+	{
+		plcolour_t color = CL_PLColours_Parse(cl_damagehuecolor.string);
+		Draw_FillPlayer(18, 163, 24, 25, color, 0.2);
+	}
+	else
+	{
+		Draw_PowerupOverlays(18, 163);
+	}
+
+	return face_pic;
 }
 
 /*
@@ -1815,8 +1914,6 @@ void Sbar_Draw (void)
 
 	if (clampedSbar == 3 && scr_viewsize.value <= 110) // qe hud does not use 'traditional sbar' #qehud
 	{
-		plcolour_t color = CL_PLColours_Parse(cl_damagehuecolor.string);
-		
 		GL_SetCanvas(CANVAS_BOTTOMLEFTQE);
 
 		// armor
@@ -1865,10 +1962,7 @@ void Sbar_Draw (void)
 		}
 
 		// face
-		Sbar_DrawPic(18, 140, Sbar_FacePic());
-
-		if (cl.time <= cl.faceanimtime && cl_damagehue.value && cl_damagehuecolor.value) // woods for damagehue on sbar face
-			Draw_FillPlayer (18, 163, 24, 25, color, .2);
+		Sbar_FacePic();
 
 		// health
 
