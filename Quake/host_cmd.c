@@ -2848,8 +2848,10 @@ static void Host_Savegame_f (void)
 	COM_AddExtension(relname, ".sav", sizeof(relname));
 	Con_Printf("Saving game to ^m%s^m...\n", relname);
 
-	q_snprintf(name, sizeof(name), "%s/%s", com_gamedir, relname);
+	q_snprintf(name, sizeof(name), "%s/saves", com_gamedir); // woods - Create saves directory if it doesn't exist
+	Sys_mkdir(name);
 
+	q_snprintf(name, sizeof(name), "%s/saves/%s", com_gamedir, relname); // woods - save to saves subdirectory
 
 	f = fopen (name, "w");
 	if (!f)
@@ -2979,13 +2981,17 @@ static void Host_Loadgame_f (void)
 // been used.  The menu calls it before stuffing loadgame command
 //	SCR_BeginLoadingPlaque ();
 
-	q_snprintf(name, sizeof(name), "%s/%s", com_gamedir, relname); // woods #autoload (iw)
+	// First try loading from saves directory
+	q_snprintf(name, sizeof(name), "%s/saves/%s", com_gamedir, relname); // woods #autoload (iw)
+	start = (char*)COM_LoadMallocFile_TextMode_OSPath(name, NULL);
 
-// avoid leaking if the previous Host_Loadgame_f failed with a Host_Error
-	if (start != NULL)
-		free (start);
-	
-	start = (char *) COM_LoadMallocFile_TextMode_OSPath(name, NULL);
+	if (start == NULL) // If not found, try loading from game directory, legacy
+	{
+		q_snprintf(name, sizeof(name), "%s/%s", com_gamedir, relname); // woods #autoload (iw)
+		start = (char*) COM_LoadMallocFile_TextMode_OSPath(name, NULL);
+	}
+
+	// avoid leaking if the previous Host_Loadgame_f failed with a Host_Error
 	if (start == NULL)
 	{
 		Con_Printf ("ERROR: couldn't open.\n");
