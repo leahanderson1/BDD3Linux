@@ -9147,6 +9147,8 @@ void M_Menu_LanConfig_f (void)
 	m_state = m_lanconfig;
 	m_entersound = true;
 	
+	addresses_cached = false;
+
 	if (StartingGame)
 	{
 		// Use New Game configuration
