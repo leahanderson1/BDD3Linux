@@ -2119,7 +2119,6 @@ SCR_Speedometer -- woods #speedometer (https://github.com/matthewearl/quakespasm
 void SCR_Speedometer(void)
 {
 	float speed;
-	vec3_t vel;
 	int bad_jump = 0;
 	static float maxspeed = 0, display_speed = -1;
 	static double lastrealtime = 0;
@@ -2129,9 +2128,6 @@ void SCR_Speedometer(void)
 	char st[8];
 	float alpha = 0.5;
 	int y = scr_showspeed_y.value;
-
-	if (cl.intermission || qeintermission || crxintermission || scr_viewsize.value >= 120)
-		return;
 
 	GL_SetCanvas(CANVAS_SBAR2);
 
@@ -2195,6 +2191,9 @@ SCR_DrawSpeed -- woods #speed
 */
 void SCR_DrawSpeed (void)
 {
+	if (cl.intermission || qeintermission || crxintermission || scr_viewsize.value >= 120)
+		return;
+	
 	if (scr_showspeed.value > 1)
 	{
 		SCR_Speedometer();
