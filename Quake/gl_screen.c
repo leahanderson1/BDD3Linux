@@ -902,6 +902,26 @@ static void Crosshair_Color_Completion_f(cvar_t* cvar, const char* partial)
 }
 
 /*
+===============
+Clock_Completion_f
+===============
+*/
+static void Clock_Completion_f(cvar_t* cvar, const char* partial)
+{
+	Con_AddToTabList("0", partial, "off", NULL);
+	Con_AddToTabList("1", partial, "level time", NULL);
+	Con_AddToTabList("2", partial, "12hr clock", NULL);
+	Con_AddToTabList("3", partial, "24hr clock", NULL);
+	Con_AddToTabList("4", partial, "date only", NULL);
+	Con_AddToTabList("5", partial, "date + 12hr", NULL);
+	Con_AddToTabList("6", partial, "date + 24hr", NULL);
+	Con_AddToTabList("7", partial, "showscores date + 12hr", NULL);
+	Con_AddToTabList("8", partial, "showscores date + 24hr", NULL);
+
+	return;
+}
+
+/*
 ==================
 SCR_Init
 ==================
@@ -930,6 +950,7 @@ void SCR_Init (void)
 	Cvar_RegisterVariable (&scr_crosshaircshift); // woods #crosshair
 	Cvar_RegisterVariable (&scr_crosshairoutline); // woods #crosshair
 	Cvar_RegisterVariable (&scr_showfps);
+	Cvar_SetCompletion (&scr_clock, &Clock_Completion_f); // woods #iwtabcomplete
 	Cvar_RegisterVariable (&scr_clock);
 	Cvar_RegisterVariable (&scr_ping); // woods #scrping
 	Cvar_RegisterVariable(&scr_match_hud); // woods #matchhud
