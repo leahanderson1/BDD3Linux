@@ -26,8 +26,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <sys/stat.h>
 #include <fcntl.h>
 #ifdef _WIN32
+#include <windows.h>
 #include <io.h>
 #else
+#include <dirent.h>
 #include <unistd.h>
 #endif
 #include "quakedef.h"
@@ -1895,6 +1897,177 @@ static qboolean CompleteClients(const char* partial, void* unused) // woods
 	return true;
 }
 
+/*
+================
+GetTimeStampedName
+================
+*/
+static const char* GetTimeStampedName(void)
+{
+	static char suggestion[MAX_OSPATH];
+	char str[24];
+	time_t systime = time(0);
+	struct tm loct = *localtime(&systime);
+
+	strftime(str, sizeof(str), "%m-%d-%Y-%H%M%S", &loct);
+	q_snprintf(suggestion, sizeof(suggestion), "%s_%s", cl.mapname, str);
+
+	return suggestion;
+}
+
+/*
+================
+CompleteRecord
+================
+*/
+static qboolean CompleteRecord(const char* partial, void* unused)
+{
+	if (Cmd_Argc() != 2)
+		return false;
+
+	// Only provide completion if we're connected to a map
+	if (cls.state != ca_connected)
+		return false;
+
+	Con_AddToTabList(GetTimeStampedName(), partial, NULL, NULL);
+	return true;
+}
+
+/*
+================
+CompleteSave
+================
+*/
+static qboolean CompleteSave(const char* partial, void* unused)
+{
+	if (Cmd_Argc() != 2)
+		return false;
+
+	// Only provide completion if we're connected to a map in single player/coop
+	if (cls.state != ca_connected || cl.gametype == GAME_DEATHMATCH)
+		return false;
+
+	Con_AddToTabList(GetTimeStampedName(), partial, NULL, NULL);
+	return true;
+}
+
+/*
+================
+GetSaveMapName -- Read mapname from save file
+================
+*/
+static const char* GetSaveMapName(const char* filepath)
+{
+	static char mapname[MAX_QPATH];
+	FILE* f;
+	int version;
+	float time;
+	int j;
+	char name[MAX_OSPATH];
+
+	mapname[0] = 0;
+	f = fopen(filepath, "r");
+	if (!f)
+		return mapname;
+
+	// Read version and name
+	if (fscanf(f, "%i\n", &version) != 1 ||
+		fscanf(f, "%79s\n", name) != 1)
+	{
+		fclose(f);
+		return mapname;
+	}
+
+	// Read spawn parms
+	for (j = 0; j < NUM_BASIC_SPAWN_PARMS; j++) {
+		if (fscanf(f, "%f\n", &time) != 1) {
+			fclose(f);
+			return mapname;
+		}
+	}
+
+	// Read skill
+	if (fscanf(f, "%f\n", &time) != 1) {
+		fclose(f);
+		return mapname;
+	}
+
+	// Read map name
+	if (fscanf(f, "%79s\n", mapname) != 1) {
+		fclose(f);
+		return mapname;
+	}
+
+	fclose(f);
+	return mapname;
+}
+
+static void SearchSaveFiles(const char* searchdir, const char* partial)
+{
+#ifdef _WIN32
+	char searchpath[MAX_OSPATH];
+	WIN32_FIND_DATA fdat;
+	HANDLE fhnd;
+
+	q_snprintf(searchpath, sizeof(searchpath), "%s/*.sav", searchdir);
+	fhnd = FindFirstFile(searchpath, &fdat);
+	if (fhnd != INVALID_HANDLE_VALUE)
+	{
+		do
+		{
+			if (!(fdat.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+			{
+				char basename[MAX_OSPATH];
+				char fullpath[MAX_OSPATH];
+				COM_StripExtension(fdat.cFileName, basename, sizeof(basename));
+				q_snprintf(fullpath, sizeof(fullpath), "%s/%s", searchdir, fdat.cFileName);
+				Con_AddToTabList(basename, partial, GetSaveMapName(fullpath), NULL);
+			}
+		} while (FindNextFile(fhnd, &fdat));
+		FindClose(fhnd);
+	}
+#else
+	DIR* dir_p;
+	struct dirent* dir_t;
+	const char* ext = ".sav";
+
+	dir_p = opendir(searchdir);
+	if (dir_p)
+	{
+		while ((dir_t = readdir(dir_p)) != NULL)
+		{
+			if (strlen(dir_t->d_name) > 4 &&
+				!q_strcasecmp(dir_t->d_name + strlen(dir_t->d_name) - 4, ext))
+			{
+				char basename[MAX_OSPATH];
+				char fullpath[MAX_OSPATH];
+				COM_StripExtension(dir_t->d_name, basename, sizeof(basename));
+				q_snprintf(fullpath, sizeof(fullpath), "%s/%s", searchdir, dir_t->d_name);
+				Con_AddToTabList(basename, partial, GetSaveMapName(fullpath), NULL);
+			}
+		}
+		closedir(dir_p);
+	}
+#endif
+}
+
+static qboolean CompleteLoad(const char* partial, void* unused)
+{
+	if (Cmd_Argc() != 2)
+		return false;
+
+	char savedir[MAX_OSPATH];
+
+	// Search in gamedir/saves
+	q_snprintf(savedir, sizeof(savedir), "%s/saves", com_gamedir);
+	SearchSaveFiles(savedir, partial);
+
+	// Search in gamedir
+	SearchSaveFiles(com_gamedir, partial);
+
+	return true;
+}
+
 extern qboolean CompletePAKList(const char* partial, void* unused); // woods #unpak
 
 qboolean CompleteImageList (const char* partial, void* unused); // woods
@@ -1916,7 +2089,6 @@ static const arg_completion_type_t arg_completion_types[] =
 	{ "entdump",				CompleteFileList,		&extralevels },
 	{ "game",					CompleteFileList,		&modlist },
 	{ "gamedir",				CompleteFileList,		&modlist },
-	{ "record",					CompleteFileListDemo,	&demolist },
 	{ "playdemo",				CompleteFileListDemo,	&demolist },
 	{ "timedemo",				CompleteFileListDemo,	&demolist },
 	{ "sky",					CompleteFileList,		&skylist },
@@ -1961,7 +2133,10 @@ static const arg_completion_type_t arg_completion_types[] =
 	{ "unpak",					CompletePAKList,		NULL },
 	{ "cmd",					CompleteGeneralList,	NULL },
 	{ "identify",				CompleteClients,		NULL },
-	{ "tell",					CompleteClients,		NULL }
+	{ "tell",					CompleteClients,		NULL },
+	{ "record",					CompleteRecord,			NULL },
+	{ "save",					CompleteSave,			NULL },
+	{ "load",					CompleteLoad,			NULL }
 };
 
 static const int num_arg_completion_types =
