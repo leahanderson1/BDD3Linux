@@ -2951,7 +2951,7 @@ void LaserSight (void)
 			glDisable(GL_POINT_SMOOTH);
 			glPointSize(1.0f);
 
-			PScript_RunParticleEffectTypeString(wall, NULL, 1, "laserpoint"); // particle cfg "r_part laserpoint" for dot on wall
+			PScript_RunParticleEffectTypeString(wall, NULL, 1, "EF_LASERPOINT"); // particle cfg "r_part laserpoint" for dot on wall
 		}
 	}
 
