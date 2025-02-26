@@ -25,6 +25,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "q_ctype.h" // woods #modsmenu (iw)
 #include <curl/curl.h> // woods #serversmenu
 #include "json.h" // woods #serversmenu
+#include <sys/stat.h>
+
+#ifdef _WIN32
+#include <sys/types.h>
+#else
+#include <unistd.h>
+#endif
 
 void (*vid_menucmdfn)(void); //johnfitz
 void (*vid_menudrawfn)(void);
@@ -1637,38 +1644,135 @@ int		load_cursor;		// 0 < load_cursor < MAX_SAVEGAMES
 char	m_filenames[MAX_SAVEGAMES][SAVEGAME_COMMENT_LENGTH+1];
 int		loadable[MAX_SAVEGAMES];
 
+typedef struct {
+	char name[SAVEGAME_COMMENT_LENGTH + 1];
+	char date[32];
+	char mapname[MAX_QPATH];
+	time_t timestamp;
+	qboolean loadable;
+	int original_index;
+} save_entry_t;
+
+static save_entry_t save_entries[MAX_SAVEGAMES];
+
+static int save_compare(const void* a, const void* b) // Comparison function for qsort
+{
+	const save_entry_t* sa = (const save_entry_t*)a;
+	const save_entry_t* sb = (const save_entry_t*)b;
+
+	// Sort loadable saves first, then by timestamp (newest first)
+	if (sa->loadable != sb->loadable)
+		return sb->loadable - sa->loadable;
+	return (sb->timestamp - sa->timestamp);
+}
+
 void M_ScanSaves (void)
 {
 	int	i, j;
 	char	name[MAX_OSPATH];
 	FILE	*f;
 	int	version;
+	float time;
+	char mapname[MAX_QPATH];
+#ifdef _WIN32
+	struct _stat st;
+#else
+	struct stat st;
+#endif
 
 	for (i = 0; i < MAX_SAVEGAMES; i++)
 	{
-		strcpy (m_filenames[i], "--- UNUSED SLOT ---");
-		loadable[i] = false;
+		save_entries[i].name[0] = 0;
+		save_entries[i].date[0] = 0;
+		save_entries[i].timestamp = 0;
+		save_entries[i].loadable = false;
+		save_entries[i].original_index = i;
+		q_strlcpy(save_entries[i].mapname, "", sizeof(save_entries[i].mapname));
+
 		q_snprintf (name, sizeof(name), "%s/s%i.sav", com_gamedir, i);
 		f = fopen (name, "r");
 		if (!f)
+		{
+			strcpy (save_entries[i].name, "--- UNUSED SLOT ---");
 			continue;
+		}
+
+		// Get file modification time
+#ifdef _WIN32
+		if (_stat(name, &st) == 0)
+#else
+		if (stat(name, &st) == 0)
+#endif
+		{
+			struct tm* timeinfo = localtime(&st.st_mtime);
+			if (timeinfo)
+			{
+				strftime(save_entries[i].date, sizeof(save_entries[i].date),
+					"%Y-%m-%d %H:%M", timeinfo);
+				save_entries[i].timestamp = st.st_mtime;
+			}
+		}
+
+		// Read version and name
 		if (fscanf (f, "%i\n", &version) != 1 || // woods
 			fscanf (f, "%79s\n", name) != 1)
 		{
 			fclose(f);
 			continue;
 		}
-		q_strlcpy (m_filenames[i], name, SAVEGAME_COMMENT_LENGTH+1);
+
+		// Read spawn parms (skip them)
+		for (j = 0; j < NUM_BASIC_SPAWN_PARMS; j++)
+		{
+			if (fscanf(f, "%f\n", &time) != 1)
+			{
+				fclose(f);
+				continue;
+			}
+		}
+
+		// Read skill
+		if (fscanf(f, "%f\n", &time) != 1)
+		{
+			fclose(f);
+			continue;
+		}
+
+		// Read map name
+		if (fscanf(f, "%79s\n", mapname) == 1)
+		{
+			q_strlcpy (save_entries[i].mapname, mapname, sizeof(save_entries[i].mapname));
+		}
+
+		q_strlcpy (save_entries[i].name, name, SAVEGAME_COMMENT_LENGTH + 1);
 
 	// change _ back to space
 		for (j = 0; j < SAVEGAME_COMMENT_LENGTH; j++)
 		{
-			if (m_filenames[i][j] == '_')
-				m_filenames[i][j] = ' ';
+			if (save_entries[i].name[j] == '_')
+				save_entries[i].name[j] = ' ';
 		}
-		loadable[i] = true;
-		fclose (f);
+
+		// Fix the kills pattern - handle both single and double spaces after slash
+		char* kills = strstr(save_entries[i].name, "kills:");
+		if (kills)
+		{
+			char* slash = strchr(kills, '/');
+			if (slash && slash[1] == ' ')
+			{
+				if (slash[2] == ' ')  // Double space case
+					memmove(slash + 1, slash + 3, strlen(slash + 3) + 1);
+				else  // Single space case
+					memmove(slash + 1, slash + 2, strlen(slash + 2) + 1);
 	}
+}
+
+		save_entries[i].loadable = true;
+		fclose(f);
+	}
+
+	// Sort the entries
+	qsort(save_entries, MAX_SAVEGAMES - 1, sizeof(save_entry_t), save_compare);
 }
 
 void M_Menu_Load_f (void)
@@ -1700,35 +1804,40 @@ void M_Menu_Save_f (void)
 }
 
 
-void M_Load_Draw (void)
+static void M_DrawSaveSlots (const char* title_pic)
 {
-	int		i;
-	qpic_t	*p;
+	qpic_t* p = Draw_CachePic(title_pic);
+	M_DrawPic((320 - p->width) / 2, 4, p);
 
-	p = Draw_CachePic ("gfx/p_load.lmp");
-	M_DrawPic ( (320-p->width)/2, 4, p);
+	for (int i = 0; i < MAX_SAVEGAMES - 1; i++)
+	{
+		M_Print(16, 32 + 8 * i, save_entries[i].name);
+	}
 
-	for (i = 0; i < MAX_SAVEGAMES; i++)
-		M_Print (16, 32 + 8*i, m_filenames[i]);
+	// Draw date info in last slot position with white text
+	if (save_entries[load_cursor].loadable)
+	{
+		char info[128];
+		M_Print(16, 32 + 8 * (MAX_SAVEGAMES - 1) + 4, "last save:");
+		q_snprintf(info, sizeof(info), "%s (%s)",
+			save_entries[load_cursor].date,
+			save_entries[load_cursor].mapname);
+		M_PrintWhite(100, 32 + 8 * (MAX_SAVEGAMES - 1) + 4, info);
+	}
 
 // line cursor
-	M_DrawCharacter (8, 32 + load_cursor*8, 12+((int)(realtime*4)&1));
+	if (load_cursor < MAX_SAVEGAMES - 1)
+		M_DrawCharacter(8, 32 + load_cursor * 8, 12 + ((int)(realtime * 4) & 1));
 }
 
+void M_Load_Draw (void)
+{
+	M_DrawSaveSlots ("gfx/p_load.lmp");
+}
 
 void M_Save_Draw (void)
 {
-	int		i;
-	qpic_t	*p;
-
-	p = Draw_CachePic ("gfx/p_save.lmp");
-	M_DrawPic ( (320-p->width)/2, 4, p);
-
-	for (i = 0; i < MAX_SAVEGAMES; i++)
-		M_Print (16, 32 + 8*i, m_filenames[i]);
-
-// line cursor
-	M_DrawCharacter (8, 32 + load_cursor*8, 12+((int)(realtime*4)&1));
+	M_DrawSaveSlots ("gfx/p_save.lmp");
 }
 
 
@@ -1748,7 +1857,7 @@ void M_Load_Key (int k)
 	case K_ABUTTON:
 	case K_MOUSE1: // woods #mousemenu
 		S_LocalSound ("misc/menu2.wav");
-		if (!loadable[load_cursor])
+		if (!save_entries[load_cursor].loadable)
 			return;
 		m_state = m_none;
 		key_dest = key_game;
@@ -1759,23 +1868,23 @@ void M_Load_Key (int k)
 		SCR_BeginLoadingPlaque ();
 
 	// issue the load command
-		Cbuf_AddText (va ("load s%i\n", load_cursor) );
+		Cbuf_AddText (va ("load s%i\n", save_entries[load_cursor].original_index));
 		return;
+
+	case K_DOWNARROW:
+	case K_RIGHTARROW:
+		S_LocalSound("misc/menu1.wav");
+		load_cursor++;
+		if (load_cursor >= MAX_SAVEGAMES - 1)
+			load_cursor = 0;
+		break;
 
 	case K_UPARROW:
 	case K_LEFTARROW:
 		S_LocalSound ("misc/menu1.wav");
 		load_cursor--;
 		if (load_cursor < 0)
-			load_cursor = MAX_SAVEGAMES-1;
-		break;
-
-	case K_DOWNARROW:
-	case K_RIGHTARROW:
-		S_LocalSound ("misc/menu1.wav");
-		load_cursor++;
-		if (load_cursor >= MAX_SAVEGAMES)
-			load_cursor = 0;
+			load_cursor = MAX_SAVEGAMES - 2;
 		break;
 	}
 }
@@ -1799,7 +1908,7 @@ void M_Save_Key (int k)
 		m_state = m_none;
 		key_dest = key_game;
 		IN_UpdateGrabs();
-		Cbuf_AddText (va("save s%i\n", load_cursor));
+		Cbuf_AddText (va("save s%i\n", save_entries[load_cursor].original_index));
 		return;
 
 	case K_UPARROW:
@@ -1807,14 +1916,14 @@ void M_Save_Key (int k)
 		S_LocalSound ("misc/menu1.wav");
 		load_cursor--;
 		if (load_cursor < 0)
-			load_cursor = MAX_SAVEGAMES-1;
+			load_cursor = MAX_SAVEGAMES - 2;
 		break;
 
 	case K_DOWNARROW:
 	case K_RIGHTARROW:
 		S_LocalSound ("misc/menu1.wav");
 		load_cursor++;
-		if (load_cursor >= MAX_SAVEGAMES)
+		if (load_cursor >= MAX_SAVEGAMES - 1)
 			load_cursor = 0;
 		break;
 	}
@@ -1822,12 +1931,12 @@ void M_Save_Key (int k)
 
 void M_Load_Mousemove(int cx, int cy) // woods #mousemenu
 {
-	M_UpdateCursor(cy, 32, 8, MAX_SAVEGAMES, &load_cursor);
+	M_UpdateCursor(cy, 32, 8, MAX_SAVEGAMES-1, &load_cursor);
 }
 
 void M_Save_Mousemove(int cx, int cy) // woods #mousemenu
 {
-	M_UpdateCursor(cy, 32, 8, MAX_SAVEGAMES, &load_cursor);
+	M_UpdateCursor(cy, 32, 8, MAX_SAVEGAMES-1, &load_cursor);
 }
 
 /*
