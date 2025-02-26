@@ -2432,10 +2432,9 @@ qboolean CL_ParseProQuakeString(const char* string) // #pqteam
 	else
 		cl.notobserver = 0;
 
-	if (!q_strcasecmp(observer, "eyecam") || !q_strcasecmp(star_observer, "eyecam"))
-		cl.eyecam = true;
-	else
-		cl.eyecam = false;
+	cl.eyecam = (q_strcasecmp(observing, "off") != 0) &&
+		(q_strcasecmp(observing, "") != 0) &&
+		((!q_strcasecmp(observer, "eyecam")) || (!q_strcasecmp(star_observer, "eyecam")));
 
 	if (((cl.seconds > 0 && cl.seconds != 255) || (cl.minutes > 0 && cl.minutes != 255)) && cl.match_pause_time == 0 && q_strcasecmp(mode, "ffa")) // is there a match in progress?
 		cl.matchinp = 1;
