@@ -2414,7 +2414,7 @@ qboolean CL_ParseProQuakeString(const char* string) // #pqteam
 	{// am I colored up?
 
 		char buf[10];
-		char buf2[10];
+		char buf2[32];
 		char buf3[10];
 		char buf4[10];
 		char buf5[10];
@@ -2425,12 +2425,23 @@ qboolean CL_ParseProQuakeString(const char* string) // #pqteam
 		spectator = Info_GetKey(cl.scores[cl.realviewentity - 1].userinfo, "*spectator", buf4, sizeof(buf4)); // woods #autovote
 	}
 
+	if (cl.modtype == 4) // no *obs key
+	{
+		if ((!q_strcasecmp(observer, "off") || observer[0] == '\0') &&
+			(!q_strcasecmp(observing, "off") || observing[0] == '\0')) // use info keys to detect
+			cl.notobserver = 1;
+		else
+			cl.notobserver = 0;
+	}
+	else 
+	{
 	if ((!q_strcasecmp(observer, "off") || observer[0] == '\0' ||
 		!q_strcasecmp(star_observer, "off") || star_observer[0] == '\0') &&
 		(!q_strcasecmp(observing, "off") || observing[0] == '\0')) // use info keys to detect
 		cl.notobserver = 1;
 	else
 		cl.notobserver = 0;
+	}
 
 	cl.eyecam = (q_strcasecmp(observing, "off") != 0) &&
 		(q_strcasecmp(observing, "") != 0) &&
