@@ -2643,10 +2643,6 @@ static void CL_ServerExtension_ItemTimer_f (void) // woods #obstimers (FTE)
 
 static void CL_ServerExtension_TeamInfo_f(void) // woods #teaminfo
 {
-	static float last_print_time = 0;
-	static float last_loc_update = 0;
-	static char cached_locations[MAX_SCOREBOARD][64];  // Cache for locations
-
 	int pidx = atoi(Cmd_Argv(1));
 	vec3_t org = {
 		atof(Cmd_Argv(2)),
@@ -2667,25 +2663,6 @@ static void CL_ServerExtension_TeamInfo_f(void) // woods #teaminfo
 		player->tinfo.items = items;
 		player->tinfo.speed = speed;
 		VectorCopy(org, player->tinfo.origin);
-
-		for (int i = 0; i < cl.maxclients; i++)
-		{
-			scoreboard_t* p = &cl.scores[i];
-			if (p->name[0] && p->tinfo.time > cl.time && p->tinfo.speed >= 10)
-			{
-				// Only update if enough time passed or moved significantly
-				if (cl.time - p->tinfo.last_loc_update >= 1.0 ||
-					DistanceBetween2Points(p->tinfo.origin, p->tinfo.last_origin) > 32) // 32 units to move before updating location
-				{
-					const char* loc = LOC_GetLocation(p->tinfo.origin);
-					Q_strncpy(cached_locations[i], loc ? loc : "unknown", sizeof(cached_locations[i]));
-
-					// Update tracking info
-					p->tinfo.last_loc_update = cl.time;
-					VectorCopy(p->tinfo.origin, p->tinfo.last_origin);
-				}
-			}
-		}
 	}
 }
 
