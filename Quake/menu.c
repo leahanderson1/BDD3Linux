@@ -5065,6 +5065,8 @@ static void M_Graphics_AdjustSliders(int dir)
 
 	case GRAPHICS_CUSTOMPARTICLES:
 		if (Q_strcmp(r_particledesc.string, "qssm") == 0)
+			Cvar_Set("r_particledesc", "qssmc");
+		else if (Q_strcmp(r_particledesc.string, "qssmc") == 0)
 			Cvar_Set("r_particledesc", "classic");
 		else
 			Cvar_Set("r_particledesc", "qssm");
@@ -5190,7 +5192,12 @@ void M_Graphics_Draw(void)
 
 		case GRAPHICS_CUSTOMPARTICLES:
 			text = "  Custom Particles";
-			value = Q_strcmp(r_particledesc.string, "qssm") == 0 ? "qssm" : "off (classic)";
+			if (Q_strcmp(r_particledesc.string, "qssm") == 0)
+				value = "qssm";
+			else if (Q_strcmp(r_particledesc.string, "qssmc") == 0)
+				value = "classic+qssm";
+			else
+				value = "off (classic)";
 			M_Print(178, y, value);
 			break;
 
