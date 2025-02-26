@@ -3330,6 +3330,9 @@ void SCR_DrawAutoID(void)
 	}
 }
 
+float last_pause_time = 0.0f; // woods #obstimers - Store pause start time
+float pause_offset = 0.0f; // woods #obstimers - Accumulated pause offset
+
 /*
 ==============
 SCR_DrawObsTimers -- woods #obstimers
@@ -3370,6 +3373,19 @@ void SCR_DrawObsTimers (void)
 			base_y -= 23;
 	}
 
+	if (cl.match_pause_time > 0) 
+	{
+		// During pause: calculate current pause duration
+		float pause_duration = cl.time - cl.match_pause_time;
+		last_pause_time = cl.match_pause_time;
+		pause_offset = pause_duration;
+	}
+	else if (last_pause_time > 0) 
+	{
+		// Pause just ended: keep the final offset
+		last_pause_time = 0;
+	}
+
 	// Timer collection structure
 	typedef struct {
 		struct itemtimer_s* timer;
@@ -3382,6 +3398,13 @@ void SCR_DrawObsTimers (void)
 	for (struct itemtimer_s* timer = cl.itemtimers; timer; timer = timer->next)
 	{
 		float time_left = timer->end - cl.time;
+
+		// Add pause offset to time_left if we're paused or have a stored offset
+		if (cl.match_pause_time > 0 || pause_offset > 0)
+		{
+			time_left += pause_offset;
+		}
+
 		if (time_left <= COUNTDOWN_TIME && time_left > -1.0 &&
 			num_visible < MAX_VISIBLE_TIMERS) {
 			visible_timers[num_visible].timer = timer;
