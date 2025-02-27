@@ -53,6 +53,7 @@ void Host_Name_Backup_f(void); // woods #smartafk
 void Host_Name_Load_Backup_f(void); // woods #smartafk
 
 qboolean IsOneVsOneMatch (void); // woods #detectmatch
+void IN_ObsFragsClick (int mouse_x, int mouse_y); // woods #eyemouse
 
 #ifdef __APPLE__
 /* Mouse acceleration needs to be disabled on OS X */
@@ -312,6 +313,14 @@ static void IN_Deactivate (qboolean free_cursor)
 }
 #endif
 
+extern qboolean	qeintermission; // woods #qeintermission
+extern qboolean crxintermission; // woods #crxintermission
+
+qboolean CL_IsActiveObserver (void) // woods #eyemouse
+{
+	return (cl.modtype == 1 && cl.eyecam && !qeintermission && !crxintermission && !cl.intermission);
+}
+
 static void IN_UpdateGrabs_Internal(qboolean forecerelease)
 {
 	qboolean wantcursor;	//we're trying to get a cursor here...
@@ -319,7 +328,7 @@ static void IN_UpdateGrabs_Internal(qboolean forecerelease)
 	qboolean needevents;	//whether we want to receive events still
 
 	qboolean gamecodecursor = (key_dest == key_game && cl.qcvm.cursorforced) || (key_dest == key_menu && cls.menu_qcvm.cursorforced);
-	wantcursor = (key_dest == key_menu&&!bind_grab) || gamecodecursor || !windowhasfocus; // woods no cursor needed in console
+	wantcursor = ((key_dest == key_game && CL_IsActiveObserver()) || (key_dest == key_menu&&!bind_grab)) || gamecodecursor || !windowhasfocus; // woods no cursor needed in console
 	freemouse = wantcursor || gamecodecursor; // woods #mousemenu
 	needevents = (!wantcursor) || key_dest == key_game;
 
@@ -1216,6 +1225,60 @@ static void IN_DebugKeyEvent(SDL_Event *event)
 #endif
 }
 
+// woods #eyemouse
+
+#define LONG_PRESS_TIME 500 // 500ms = 0.5 seconds
+#define COOL_DOWN_TIME 300 // 300ms = 0.3 seconds
+static qboolean is_long_pressing = false;
+static Uint32 press_start_time = 0;
+static qboolean long_press_triggered = false; // Add this to prevent multiple triggers
+
+static void IN_HandleObserverMouseEvents (SDL_Event* event) // woods #eyemouse
+{
+	if (event->button.button == 1)  // Left click
+	{
+		if (event->button.state == SDL_PRESSED)
+		{
+			Uint32 current_time = SDL_GetTicks();
+
+			// Handle observer frags click
+			IN_ObsFragsClick(event->button.x, event->button.y);
+
+			press_start_time = current_time;
+			is_long_pressing = true;
+			long_press_triggered = false;
+		}
+		else if (event->button.state == SDL_RELEASED)
+		{
+			if (is_long_pressing && long_press_triggered)
+			{
+				Cbuf_AddText("-showscores\n");
+			}
+			is_long_pressing = false;
+			long_press_triggered = false;
+		}
+	}
+	else if (event->button.button == 3)  // Right click
+	{
+		static Uint32 last_flyme_time = 0;
+		Uint32 current_time = SDL_GetTicks();
+
+		if (event->button.state == SDL_PRESSED)
+		{
+			// Add cooldown to prevent accidental double-clicks (300ms)
+			if (current_time - last_flyme_time > COOL_DOWN_TIME)
+			{
+				// Execute flyme command on right-click
+				if (Cmd_AliasExists("flyme"))
+					Cbuf_AddText("flyme\n");
+				else
+					Cbuf_AddText("impulse 142\n");
+				last_flyme_time = current_time;
+			}
+		}
+	}
+}
+
 void IN_SendKeyEvents (void)
 {
 	SDL_Event event;
@@ -1224,6 +1287,16 @@ void IN_SendKeyEvents (void)
 
 	char afktype[4];
 	sprintf(afktype, "%s", "AFK");
+
+	if (is_long_pressing && !long_press_triggered && cl.modtype == 1 && cl.eyecam) // woods #eyemouse
+	{
+		Uint32 current_time = SDL_GetTicks();
+		if (current_time - press_start_time >= LONG_PRESS_TIME)
+		{
+			long_press_triggered = true;  // Prevent multiple triggers
+			Cbuf_AddText("+showscores\n");
+		}
+	}
 
 	if ((cl.gametype == GAME_DEATHMATCH) && (cls.state == ca_connected))
 	{
@@ -1370,12 +1443,27 @@ void IN_SendKeyEvents (void)
 		case SDL_MOUSEBUTTONDOWN:
 		case SDL_MOUSEBUTTONUP:
 			if (event.button.button < 1 ||
-			    event.button.button > sizeof(buttonremap) / sizeof(buttonremap[0]))
+				event.button.button > sizeof(buttonremap) / sizeof(buttonremap[0]))
 			{
 				Con_Printf ("Ignored event for mouse button %d\n",
-							event.button.button);
+					event.button.button);
 				break;
 			}
+
+			// Handle eyecam observer mode #eyemouse
+			if (key_dest == key_game && cl.modtype == 1 && cl.eyecam)
+			{
+				IN_HandleObserverMouseEvents(&event);
+
+				// Always send button release events
+				// even in eyecam mode to ensure buttons don't get stuck
+				if (event.button.state == SDL_RELEASED)
+				{
+					Key_Event(buttonremap[event.button.button - 1], false);
+				}
+				break;
+			}
+
 			if (key_dest == key_menu) // woods #mousemenu
 				M_Mousemove(event.button.x, event.button.y);
 			Key_Event(buttonremap[event.button.button - 1], event.button.state == SDL_PRESSED);
@@ -1398,8 +1486,13 @@ void IN_SendKeyEvents (void)
 
 		case SDL_MOUSEMOTION:
 			if (key_dest == key_menu) // woods #mousemenu
+			{
 				M_Mousemove(event.button.x, event.button.y);
-			IN_MouseMotion(event.motion.xrel, event.motion.yrel, event.motion.x, event.motion.y);
+			}
+			else if (!(key_dest == key_game && cl.modtype == 1 && cl.eyecam)) // woods #eyemouse
+			{
+				IN_MouseMotion(event.motion.xrel, event.motion.yrel, event.motion.x, event.motion.y);
+			}
 			break;
 
 #if defined(USE_SDL2)
@@ -1461,4 +1554,19 @@ void IN_SendKeyEvents (void)
 			break;
 		}
 	}
+
+	static qboolean was_in_eyecam = false; // woods #eyemouse
+	if (was_in_eyecam && !(cl.modtype == 1 && cl.eyecam))
+	{
+		// We just exited eyecam mode, make sure mouse buttons are released
+		if (is_long_pressing)
+		{
+			if (long_press_triggered)
+				Cbuf_AddText("-showscores\n");
+
+			is_long_pressing = false;
+			long_press_triggered = false;
+		}
+	}
+	was_in_eyecam = (cl.modtype == 1 && cl.eyecam);
 }

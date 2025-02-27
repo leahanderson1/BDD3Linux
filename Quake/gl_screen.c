@@ -1861,9 +1861,16 @@ void SCR_DrawMatchScores(void)
 		return;
 }
 
+// woods #eyemouse
+
+static int obs_frags_x;
+static int obs_frags_y;
+static int obs_frags_height;
+static qboolean obs_frags_active;  // Track if the frags list is currently being displayed	
+
 /*
 =======================
-SCR_ShowObsFrags -- added by woods #observerhud
+SCR_ShowObsFrags -- added by woods #observerhud #eyemouse
 =======================
 */
 
@@ -1884,6 +1891,8 @@ void SCR_ShowObsFrags(void)
 
 	if (scr_viewsize.value >= 120)
 		return;
+
+	obs_frags_active = true;
 
 	if ((cl.gametype == GAME_DEATHMATCH) && (cls.state == ca_connected))
 	{
@@ -1909,6 +1918,11 @@ void SCR_ShowObsFrags(void)
 				x = 10;
 				y = 160;
 			}
+
+			// Store coordinates for click detection
+			obs_frags_x = x;
+			obs_frags_y = y;
+			obs_frags_height = scoreboardlines * 8;
 
 			char qflbracket[2] = { 144, '\0' }; // woods  -- quake font left bracket
 			char qfrbracket[2] = { 145, '\0' }; // woods  -- quake font right bracket
@@ -1941,8 +1955,123 @@ void SCR_ShowObsFrags(void)
 				sprintf(shortname, "%.15s", s->name); // woods only show name, not 'ready' or 'afk' -- 15 characters
 				M_PrintWhite(x + 50, y, shortname);
 			}
+			obs_frags_active = true;
 		}
 	}
+}
+
+void Draw_GetScoreboardTransform (vrect_t* bounds, vrect_t* viewport) // woods #eyemouse
+{
+	int clampedSbar = CLAMP(1, (int)scr_sbar.value, 3);
+
+	if (clampedSbar == 3)
+	{
+		bounds->x = 0;
+		bounds->y = 0;
+		bounds->width = 320;
+		bounds->height = 300;
+
+		viewport->x = glx;
+		viewport->y = gly;
+		viewport->width = glwidth;
+		viewport->height = glheight;
+	}
+	else
+	{
+		bounds->x = 0;
+		bounds->y = 0;
+		bounds->width = 320;
+		bounds->height = 200;
+
+		viewport->x = glx;
+		viewport->y = gly;
+		viewport->width = glwidth;
+		viewport->height = glheight;
+		}
+}
+
+void IN_ObsFragsClick(int x, int y) // woods #eyemouse
+{
+	// Early return if observer frags aren't active
+	if (!obs_frags_active)
+		return;
+
+	vrect_t bounds, viewport;
+	Draw_GetScoreboardTransform(&bounds, &viewport);
+	int clampedSbar = CLAMP(1, (int)scr_sbar.value, 3);
+
+	float scale;
+	int row = -1;
+	int itemheight = 8; // each entry is 8 units tall
+
+	// Calculate row based on sbar mode
+	if (clampedSbar == 3)
+	{
+		scale = CLAMP(1.0, scr_sbarscale.value / 1.2, (float)glwidth / 320.0);
+		x = (int)(x / scale);
+		y = (int)((viewport.height - y) / scale);
+		y = 300 - y;
+		row = (182 - y) / itemheight;
+	}
+	else
+	{
+		scale = (float)glwidth / vid.conwidth;
+		x = (int)(x / scale);
+		y = (int)((viewport.height - y) / scale);
+		y += 19;
+		row = (y - 151) / itemheight;
+	}
+
+	// Validate row bounds
+	if (row < 0 || row >= scoreboardlines)
+	{
+		Con_DPrintf("ObsFragsClick: Row %d is out of bounds (valid range: 0 to %d)\n",
+			row, scoreboardlines - 1);
+		return;
+	}
+
+	// Get the player corresponding to the computed row
+	int playernum = fragsort[row];
+	scoreboard_t* s = &cl.scores[playernum];
+
+	// Skip empty entries
+	if (!s->name[0])
+	{
+		Con_DPrintf("ObsFragsClick: Empty player entry at row %d\n", row);
+		return;
+	}
+	// Create a shortened name (max 15 characters) and trim trailing spaces
+	char shortname[16];
+	char trimmed_name[16];
+	q_snprintf(shortname, sizeof(shortname), "%.15s", s->name);
+
+	// Trim trailing spaces
+	q_strlcpy(trimmed_name, shortname, sizeof(trimmed_name));
+	int len = strlen(trimmed_name);
+	while (len > 0 && trimmed_name[len - 1] == ' ')
+	{
+		trimmed_name[len - 1] = '\0';
+		len--;
+	}
+
+	// Calculate click boundaries
+	int startx = obs_frags_x;
+	int name_offset = 50;
+	int name_width = strlen(trimmed_name) * 8;
+	int total_width = name_offset + name_width;
+
+	// Validate horizontal click position
+	if (x < startx || x >= startx + total_width)
+	{
+		Con_DPrintf("ObsFragsClick: Click outside valid region (x=%d, valid=%d-%d)\n",
+			x, startx, startx + total_width);
+		return;
+	}
+
+	// Issue the track command
+	char cmd[64];
+	q_snprintf(cmd, sizeof(cmd), "cmd eyecam %d\n", playernum + 1);
+	Cbuf_AddText(cmd);
 }
 
 /*
