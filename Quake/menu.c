@@ -1689,8 +1689,14 @@ void M_ScanSaves (void)
 		save_entries[i].original_index = i;
 		q_strlcpy(save_entries[i].mapname, "", sizeof(save_entries[i].mapname));
 
-		q_snprintf (name, sizeof(name), "%s/s%i.sav", com_gamedir, i);
+		q_snprintf (name, sizeof(name), "%s/saves/s%i.sav", com_gamedir, i);
 		f = fopen (name, "r");
+		if (!f)
+		{
+			q_snprintf(name, sizeof(name), "%s/s%i.sav", com_gamedir, i); // legacy
+			f = fopen(name, "r");
+		}
+
 		if (!f)
 		{
 			strcpy (save_entries[i].name, "--- UNUSED SLOT ---");
