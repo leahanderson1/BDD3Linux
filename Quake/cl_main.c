@@ -2574,6 +2574,12 @@ static void CL_ServerExtension_ItemTimer_f (void) // woods #obstimers (FTE)
 		return;
 	}
 
+	// Check deathmatch mode
+	char buf[4];
+	const char* val;
+	val = Info_GetKey(cl.serverinfo, "deathmatch", buf, sizeof(buf));
+	int deathmatch_mode = val ? atoi(val) : 0;
+
 	float timeout;
 	float start = cl.time;
 	const char* e;
@@ -2597,6 +2603,11 @@ static void CL_ServerExtension_ItemTimer_f (void) // woods #obstimers (FTE)
 	unsigned int rgb = strtoul(tint, NULL, 16);  // Convert tint string to RGB
 	const char* timername = (Cmd_Argc() > 7) ? Cmd_Argv(7) : "";
 	unsigned int entnum = (Cmd_Argc() > 8) ? strtoul(Cmd_Argv(8), NULL, 0) : 0;
+
+	// Skip weapon timers in deathmatch 3
+	if (deathmatch_mode == 3 &&
+		(strcmp(timername, "lg") == 0 || strcmp(timername, "rl") == 0))
+		return;
 
 	// Set defaults if needed
 	if (!timeout)
