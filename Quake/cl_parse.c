@@ -3880,7 +3880,6 @@ void CL_ParseServerMessage (void)
 			else
 			{
 			if (!CL_ParseProQuakeString(s))
-			{
 				CL_ParsePrint(s);
 			}
 		}
