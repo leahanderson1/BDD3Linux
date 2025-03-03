@@ -9214,9 +9214,24 @@ void M_Menu_LanConfig_f (void)
 	IN_UpdateGrabs();
 }
 
+static qboolean ip_temporarily_visible[2] = { false, false };
+static float ip_visibility_timeout[2] = { 0, 0 };
+#define IP_VISIBILITY_DURATION 3.0f  // Show IP for 3 seconds after clicking
+
+void M_LanConfig_CheckTimeouts(void)
+{
+	// Check for timeout on temporarily visible IPs
+	for (int i = 0; i < 2; i++) {
+		if (ip_temporarily_visible[i] && realtime > ip_visibility_timeout[i]) {
+			ip_temporarily_visible[i] = false;
+		}
+	}
+}
 
 void M_LanConfig_Draw (void)
 {
+	M_LanConfig_CheckTimeouts(); // woods #contentfilter
+	
 	qpic_t	*p;
 	int		basex;
 	int		y;
@@ -9261,7 +9276,16 @@ void M_LanConfig_Draw (void)
 		ip_clickables[0].y = y;
 		ip_clickables[0].width = strlen(cached_addresses[0]) * 8;
 		strncpy(ip_clickables[0].text, cached_addresses[0], sizeof(ip_clickables[0].text));
+
+		if (cl_contentfilter.value && !ip_temporarily_visible[0]) // woods #contentfilter
+		{
+			M_Print(basex + (9 * 8) + 10, y, "local: click to view");
+			ip_clickables[0].width = 13 * 8; // Width of "click to view" text
+		}
+		else 
+		{
 		M_Print(basex + (9 * 8) + 10, y, va("local: %s", cached_addresses[0]));
+		}
 		y += 8;
 
 		// External IP
@@ -9271,7 +9295,16 @@ void M_LanConfig_Draw (void)
 		ip_clickables[1].y = y;
 		ip_clickables[1].width = strlen(my_public_ip) * 8;
 		strncpy(ip_clickables[1].text, my_public_ip, sizeof(ip_clickables[1].text));
+
+		if (cl_contentfilter.value && !ip_temporarily_visible[1]) // woods #contentfilter
+		{
+			M_Print(basex + (9 * 8) + 10, y, "ext:   click to view");
+			ip_clickables[1].width = 13 * 8; // Width of "click to view" text
+		}
+		else 
+		{
 		M_Print(basex + (9 * 8) + 10, y, va("ext:   %s", my_public_ip));
+		}
 		y += 8;
 	}
 
@@ -9379,11 +9412,32 @@ void M_LanConfig_Key (int key)
 					m_mousey >= ip_clickables[i].y &&
 					m_mousey <= ip_clickables[i].y + 8))
 			{
+				if (cl_contentfilter.value)
+				{
+					if (!ip_temporarily_visible[i])
+					{
+						// If IP is not visible, make it visible
+						ip_temporarily_visible[i] = true;
+						ip_visibility_timeout[i] = realtime + IP_VISIBILITY_DURATION;
+						S_LocalSound("misc/menu1.wav");
+					}
+					else 
+					{
 				SDL_SetClipboardText(ip_clickables[i].text);
 				strcpy(last_copied_ip, ip_clickables[i].text);
 				copy_message_time = realtime + 1.0;
 				const char* soundFile = COM_FileExists("sound/qssm/copy.wav", NULL) ? "qssm/copy.wav" : "player/tornoff2.wav";
 				S_LocalSound(soundFile);
+					}
+				}
+				else 
+				{
+					SDL_SetClipboardText(ip_clickables[i].text);
+					strcpy(last_copied_ip, ip_clickables[i].text);
+					copy_message_time = realtime + 1.0;
+					const char* soundFile = COM_FileExists("sound/qssm/copy.wav", NULL) ? "qssm/copy.wav" : "player/tornoff2.wav";
+					S_LocalSound(soundFile);
+				}
 				return;
 			}
 		}

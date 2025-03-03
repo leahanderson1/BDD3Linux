@@ -85,6 +85,7 @@ cvar_t	cl_web_download_url = {"cl_web_download_url", "q1tools.github.io", CVAR_A
 cvar_t	cl_web_download_url2 = { "cl_web_download_url2", "maps.quakeworld.nu", CVAR_ARCHIVE }; // woods #webdl
 cvar_t	cl_autovote = {"cl_autovote", "0", CVAR_ARCHIVE}; // woods #autovote
 cvar_t	cl_onload = {"cl_onload", "", CVAR_ARCHIVE}; // woods #onload
+cvar_t	cl_contentfilter = {"cl_contentfilter", "0", CVAR_ARCHIVE}; // woods #contentfilter
 
 client_static_t	cls;
 client_state_t	cl;
@@ -2982,6 +2983,7 @@ void CL_Init (void)
 	Cvar_RegisterVariable (&cl_autovote); // woods #autovote
 	Cvar_RegisterVariable (&cl_onload); // woods #onload
 	Cvar_SetCompletion (&cl_onload, &CL_Onload_Completion_f); // woods #onload
+	Cvar_RegisterVariable (&cl_contentfilter); // woods #contentfilter
 
 	WebCheckInit (); // woods -- check if the web downloads servers are live at launch (threaded) #webdl
 

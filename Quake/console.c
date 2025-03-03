@@ -255,7 +255,10 @@ static void Con_Dump_f (void)
 	}
 
 	fclose (f);
-	Con_Printf ("Dumped console text to %s.\n", name);
+	if (cl_contentfilter.value) // woods #contentfilter
+		Con_Printf("Dumped console text to %s/condump.txt.\n", COM_SkipPath(com_gamedir));
+	else
+		Con_Printf("Dumped console text to %s.\n", name);
 }
 
 /*

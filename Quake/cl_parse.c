@@ -3367,6 +3367,404 @@ static void CL_ParseCenterPrint(const char *msg)
 }
 
 /*
+=======================
+Content Filtering -- inspired by Mark V -- woods #contentfilter
+=======================
+*/
+
+typedef struct {
+	const char* word;        // Word to filter
+	const char* replacement; // Replacement text
+	qboolean whole_word;     // Only match whole words
+} filter_word_t;
+
+filter_word_t filter_words[] = {
+	{"@$$", "***", false},
+	{"@55h013", "person", false},
+	{"@55h0l3", "person", false},
+	{"@55hole", "person", false},
+	{"@ss", "***", false},
+	{"a$$", "***", false},
+	{"a55", "jazz", false},
+	{"a55h013", "person", false},
+	{"a55h0le", "person", false},
+	{"abo", "person", true},
+	{"af", "very", false},
+	{"anus", "snus", false},
+	{"arse", "bummer", false},
+	{"ass", "***", true},
+	{"asshole", "person", false},
+	{"azz", "jazz", false},
+	{"b!+ch", "witch", false},
+	{"b!7ch", "witch", false},
+	{"b!tch", "witch", false},
+	{"b00n3r", "person", false},
+	{"b17ch", "witch", false},
+	{"b1tch", "witch", false},
+	{"banana", "fruit", true},
+	{"bastard", "mustard", false},
+	{"batty boy", "person", false},
+	{"battyboy", "person", false},
+	{"beaner", "person", false},
+	{"bimbo", "person", false},
+	{"bitch", "witch", false},
+	{"blind", "unseeing", true},
+	{"blow my brains", "clear my mind", false},
+	{"boong", "person", false},
+	{"broad", "person", true},
+	{"bs", "nonsense", false},
+	{"bullshit", "nonsense", false},
+	{"butt", "****", false},
+	{"c0ck5uck3r", "person", false},
+	{"c0ck5uck4", "person", false},
+	{"camel jockey", "person", false},
+	{"chinaman", "person", false},
+	{"chink", "neighbor", false},
+	{"cock", "****", false},
+	{"coconut", "fruit", true},
+	{"coon", "raccoon", true},
+	{"cooned", "raccoon", false},
+	{"cooning", "raccoon", false},
+	{"coonery", "raccoon", false},
+	{"coons", "raccoons", false},
+	{"coolie", "worker", false},
+	{"cretin", "person", false},
+	{"cripple", "person", false},
+	{"crossdresser", "person", false},
+	{"cu57", "cute", false},
+	{"cun7", "cute", false},
+	{"cunt", "cute", false},
+	{"curry muncher", "chef", false},
+	{"cut myself", "love myself", false},
+	{"d!ck", "person", false},
+	{"d1ck", "person", false},
+	{"dago", "friend", false},
+	{"dame", "lady", true},
+	{"darkie", "person", false},
+	{"darky", "person", false},
+	{"deaf", "unhearing", true},
+	{"dickhead", "silly", false},
+	{"dilligaf", "care", false},
+	{"douche", "******", false},
+	{"dumb", "quiet", true},
+	{"dyke", "bike", true},
+	{"dyked", "biked", false},
+	{"dykes", "bikes", false},
+	{"dykey", "bikey", false},
+	{"dyking", "biking", false},
+	{"end my life", "enjoy my life", false},
+	{"eskimo", "inuit", false},
+	{"f$$k", "f**k", false},
+	{"f$ck", "f**k", false},
+	{"f0ck", "f**k", false},
+	{"f4660t", "maddog", false},
+	{"f46607", "maddog", false},
+	{"f4gg07", "maddog", false},
+	{"f4gg0t", "maddog", false},
+	{"f@6607", "maddog", false},
+	{"f@gg0t", "maddog", false},
+	{"fag", "fan", true},
+	{"fagged", "fanned", false},
+	{"fagging", "fanning", false},
+	{"faggot", "maddog", false},
+	{"faggy", "fancy", false},
+	{"fagot", "cairo", false},
+	{"fagots", "cairos", false},
+	{"fags", "fans", false},
+	{"faget", "italy", false},
+	{"fairy", "sprite", true},
+	{"fck", "heck", false},
+	{"fckn", "freaking", false},
+	{"fcking", "freaking", false},
+	{"fcuk", "fun", false},
+	{"fggt", "hawk", false},
+	{"fgt", "yam", true},
+	{"fk", "heck", false},
+	{"fking", "freaking", false},
+	{"fkn", "freaking", false},
+	{"floozy", "person", false},
+	{"fml", "sigh", false},
+	{"foad", "go away", false},
+	{"fok", "fun", false},
+	{"ftm", "person", false},
+	{"fu", "forget", false},
+	{"fuc", "fun", false},
+	{"fuck", "f**k", false},
+	{"fucking", "cheddar", false},
+	{"fuk", "fun", false},
+	{"fukking", "beijing", false},
+	{"fuq", "fun", false},
+	{"fvck", "f**k", false},
+	{"gfy", "good for you", false},
+	{"gimp", "person", false},
+	{"goddamn", "goshdarn", false},
+	{"gold digger", "person", false},
+	{"golddigger", "person", false},
+	{"golliwog", "doll", false},
+	{"gook", "buddy", false},
+	{"gringo", "visitor", false},
+	{"gtfo", "leave", false},
+	{"guido", "person", false},
+	{"guinea", "person", true},
+	{"gyp", "person", true},
+	{"gypped", "tricked", false},
+	{"gypsy", "traveler", false},
+	{"half-breed", "person", false},
+	{"halfbreed", "person", false},
+	{"hang myself", "help myself", false},
+	{"harlot", "person", false},
+	{"heeb", "person", false},
+	{"heshe", "person", false},
+	{"heshim", "them", false},
+	{"ho", "hey", true},
+	{"hoe", "gardener", true},
+	{"homo", "mang", true},
+	{"homophobe", "person", false},
+	{"homophobic", "fearful", false},
+	{"homos", "mangs", false},
+	{"honky", "pal", true},
+	{"hooker", "person", false},
+	{"hurt myself", "help myself", false},
+	{"hussy", "person", false},
+	{"hymie", "friend", false},
+	{"idiot", "person", false},
+	{"imbecile", "person", false},
+	{"injun", "friend", false},
+	{"jap", "pal", true},
+	{"jappy", "happy", false},
+	{"japs", "pals", false},
+	{"jewboy", "person", false},
+	{"jezebel", "person", false},
+	{"jfc", "jeez", false},
+	{"jigaboo", "person", false},
+	{"jiggaboo", "person", false},
+	{"jungle bunny", "person", false},
+	{"kill myself", "hug myself", false},
+	{"kike", "friend", false},
+	{"kms", "hug", false},
+	{"kraut", "friend", false},
+	{"kys", "smile", false},
+	{"ladyboy", "person", false},
+	{"lame", "weak", true},
+	{"lmfao", "haha", false},
+	{"mf", "friend", false},
+	{"mfer", "person", false},
+	{"mick", "buddy", true},
+	{"micks", "buddies", false},
+	{"midget", "person", false},
+	{"mofo", "person", false},
+	{"mongoloid", "person", false},
+	{"mong", "person", false},
+	{"moron", "person", false},
+	{"motherfucker", "motherfudger", false},
+	{"mtf", "person", false},
+	{"mulatto", "person", false},
+	{"n166a", "friend", false},
+	{"n1663r", "friend", false},
+	{"n199a", "friend", false},
+	{"n199er", "friend", false},
+	{"n1g", "man", true},
+	{"n1gg3r", "friend", false},
+	{"n1gg4", "friend", false},
+	{"nancy", "person", true},
+	{"nancy boy", "person", false},
+	{"nancyboy", "person", false},
+	{"neck myself", "respect myself", false},
+	{"negro", "person", false},
+	{"ngr", "ron", true},
+	{"niger", "frank", false},
+	{"nigg3r", "friend", false},
+	{"nigg4", "friend", false},
+	{"nigger", "friend", false},
+	{"off myself", "treat myself", false},
+	{"omfg", "omg", false},
+	{"oreo", "cookie", true},
+	{"paki", "buddy", true},
+	{"pakis", "buddies", false},
+	{"pansy", "flower", true},
+	{"penis", "sonar", false},
+	{"penus", "sugar", false},
+	{"ph0ck", "f**k", false},
+	{"phuck", "f**k", false},
+	{"pikey", "person", false},
+	{"pillow biter", "person", false},
+	{"polack", "person", false},
+	{"poof", "magic", true},
+	{"poofter", "person", false},
+	{"pos", "piece", false},
+	{"psycho", "person", false},
+	{"puss", "cat", true},
+	{"pusses", "cats", false},
+	{"pussy", "kitty", false},
+	{"queer", "zebop", false},
+	{"r374rd", "smart", false},
+	{"r3+4rd", "smart", false},
+	{"r3+@rd", "smart", false},
+	{"r3t4rd", "smart", false},
+	{"raghead", "neighbor", false},
+	{"redskin", "person", false},
+	{"retard", "smart", false},
+	{"rope myself", "help myself", false},
+	{"sambo", "friend", true},
+	{"schizo", "person", false},
+	{"self harm", "self care", false},
+	{"selfharm", "selfcare", false},
+	{"sh!t", "s__t", false},
+	{"sh1t", "s__t", false},
+	{"sheeny", "person", false},
+	{"shemale", "human", false},
+	{"shit", "s__t", false},
+	{"shite", "shoot", false},
+	{"sht", "shoot", false},
+	{"shyt", "shoot", false},
+	{"shim", "them", false},
+	{"sissy", "gentle", true},
+	{"51u7", "person", false},
+	{"5lu7", "person", false},
+	{"slag", "person", false},
+	{"slattern", "person", false},
+	{"slit my wrists", "call a friend", false},
+	{"slut", "person", false},
+	{"sob", "son", false},
+	{"spade", "person", true},
+	{"spastic", "person", false},
+	{"spaz", "person", false},
+	{"spic", "friend", false},
+	{"spook", "ghost", true},
+	{"spooked", "scared", false},
+	{"spooking", "scaring", false},
+	{"spooky", "scary", false},
+	{"spooks", "ghosts", false},
+	{"squaw", "woman", false},
+	{"stfu", "shush", false},
+	{"stg", "swear", false},
+	{"strumpet", "person", false},
+	{"suicidal", "sad", false},
+	{"suicide", "self-care", false},
+	{"tard", "card", true},
+	{"tart", "pie", true},
+	{"tfo", "the", false},
+	{"tfu", "up", false},
+	{"thot", "person", false},
+	{"towelhead", "citizen", false},
+	{"tramp", "person", false},
+	{"trannie", "person", false},
+	{"tranny", "person", false},
+	{"trap", "door", true},
+	{"trapped", "closed", false},
+	{"trapping", "closing", false},
+	{"traps", "doors", false},
+	{"transvestite", "individual", false},
+	{"tgirl", "person", false},
+	{"trollop", "person", false},
+	{"twink", "person", false},
+	{"vagina", "robert", false},
+	{"vegetable", "plant", true},
+	{"wench", "person", false},
+	{"wetback", "houston", false},
+	{"wh0r3", "person", false},
+	{"whore", "person", false},
+	{"wigger", "person", true},
+	{"wop", "pal", true},
+	{"wtaf", "what", false},
+	{"wtf", "wow", false},
+	{"wth", "what", false},
+	{"zipperhead", "person", false},
+
+	{NULL, NULL, false} // Terminator
+};
+
+char* String_Edit_Normalize_Text(const char* text)
+{
+	static char normalized_buffer[MAXCMDLINE];
+	char* cur = normalized_buffer;
+
+	q_strlcpy(normalized_buffer, text, MAXCMDLINE);
+
+	for (; *cur; cur++)
+	{
+		if ((unsigned char)*cur > 128) *cur -= 128;
+		*cur = tolower(*cur);
+
+		switch (*cur) {
+		case '4': case '@': *cur = 'a'; break;
+		case '3': *cur = 'e'; break;
+		case '1': case '!': *cur = 'i'; break;
+		case '0': *cur = 'o'; break;
+		case '5': case '$': *cur = 's'; break;
+		case '7': *cur = 't'; break;
+		case '+': *cur = 't'; break;
+		case '8': *cur = 'b'; break;
+		case '6': *cur = 'g'; break;
+		case '9': *cur = 'g'; break;
+		case '2': *cur = 'z'; break;
+			// Remove common punctuation used to bypass filters
+		case '.': case ',': case '-': case '_': case '*':
+		case '\'': case '"': case '`': case '\\': case '/':
+			*cur = ' '; break;
+		}
+	}
+
+	return normalized_buffer;
+}
+
+qboolean WordFilter_Check(const char* text, char* dest_buffer, size_t buffer_size)
+{
+	const char* norm_text = String_Edit_Normalize_Text(text);
+	qboolean replacement = false;
+
+	// Initialize destination with original text
+	q_strlcpy(dest_buffer, text, buffer_size);
+
+	// Create a working copy for word boundary checks
+	char working_copy[MAXCMDLINE];
+	q_strlcpy(working_copy, norm_text, sizeof(working_copy));
+
+	for (int i = 0; filter_words[i].word != NULL; i++)
+	{
+		const char* word = filter_words[i].word;
+		const char* replace = filter_words[i].replacement;
+		int word_len = strlen(word);
+		int replace_len = strlen(replace);
+
+		// Search for all instances of the word
+		char* curword = working_copy;
+		while ((curword = strstr(curword, word)))
+		{
+			// Check for whole word match if required
+			qboolean is_match = true;
+			if (filter_words[i].whole_word)
+			{
+				// Check if word boundaries exist
+				qboolean has_left_boundary = (curword == working_copy || !isalnum(*(curword - 1)));
+				qboolean has_right_boundary = (*(curword + word_len) == '\0' || !isalnum(*(curword + word_len)));
+				is_match = has_left_boundary && has_right_boundary;
+			}
+
+			if (is_match)
+			{
+				int replace_offset = curword - working_copy;
+				replacement = true;
+
+				// Make sure we don't overflow the buffer
+				if (replace_offset + replace_len < buffer_size)
+				{
+					memcpy(&dest_buffer[replace_offset], replace, replace_len);
+
+					// Mark as processed in working copy to avoid double-processing
+					memset(curword, ' ', word_len);
+				}
+			}
+
+			// Move past this instance
+			curword += word_len;
+		}
+	}
+
+	return replacement;
+}
+
+/*
 =====================
 CL_ParseServerMessage
 =====================
@@ -3469,12 +3867,23 @@ void CL_ParseServerMessage (void)
 		case svc_disconnect:
 			Host_EndGame ("Server disconnected\n");
 
-		case svc_print: //   woods pq string #pqteam
+		case svc_print: //   woods pq string #pqteam #contentfilter
+		{
+			char filtered_buffer[MAXCMDLINE];
 			s = MSG_ReadString();
+
+			if (cl_contentfilter.value == 2 && WordFilter_Check(s, filtered_buffer, sizeof(filtered_buffer))) 
+			{
+				if (!CL_ParseProQuakeString(filtered_buffer))
+					CL_ParsePrint(filtered_buffer);
+			}
+			else
+			{
 			if (!CL_ParseProQuakeString(s))
 			{
 				CL_ParsePrint(s);
 			}
+		}
 			break;
 
 		case svc_centerprint:

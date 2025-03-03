@@ -3796,7 +3796,16 @@ void SCR_ScreenShot_f (void)
 
 	if (ok)
 	{ 
-		Con_Printf ("Wrote %s\n", checkname);
+		if (cl_contentfilter.value) // woods #contentfilter
+		{
+			char filtered_path[MAX_OSPATH];
+			const char* gamedir_name = COM_SkipPath(com_gamedir);
+			q_snprintf(filtered_path, sizeof(filtered_path), "%s/screenshots/%s",
+				gamedir_name, COM_SkipPath(imagename));
+			Con_Printf("Wrote %s\n", filtered_path);
+		}
+		else
+			Con_Printf("Wrote %s\n", checkname);
 
 		const char* soundFile = COM_FileExists("sound/qssm/copy.wav", NULL) ? "qssm/copy.wav" : "player/tornoff2.wav";
 		S_LocalSound(soundFile); // woods add sound to screenshot
