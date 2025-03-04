@@ -2225,47 +2225,78 @@ void SCR_ShowFlagStatus(void)
 
 	// woods lets get some info from server infokeys
 
-	const char* redflag;
-	char buf[10];
-	redflag = Info_GetKey(cl.serverinfo, "red flag", buf, sizeof(buf));
+	static char cached_redflag[10] = "";
+	static char cached_blueflag[10] = "";
+	static Uint32 last_cache_time = 0;
+	Uint32 current_time = SDL_GetTicks();
 
-	const char* blueflag;
-	char buf2[10];
-	blueflag = Info_GetKey(cl.serverinfo, "blue flag", buf2, sizeof(buf2));
+	// Cache the values for 100 milliseconds to prevent blinking
 
-	if ((blueflag[0] != '\0' && redflag[0] != '\0') && !cls.demoplayback) // is there a key on the server (newer version of crx)
+	if (current_time - last_cache_time > 100 || cached_redflag[0] == '\0' || cached_blueflag[0] == '\0')
 	{
-		strncpy(cl.flagstatus, "n", sizeof(cl.flagstatus)); // null flag, reset all flag ... flags :)
+	char buf[10];
+		const char* redflag = Info_GetKey(cl.serverinfo, "red flag", buf, sizeof(buf));
+		Q_strncpy(cached_redflag, redflag, sizeof(cached_redflag) - 1);
+		cached_redflag[sizeof(cached_redflag) - 1] = '\0';
+
+	char buf2[10];
+		const char* blueflag = Info_GetKey(cl.serverinfo, "blue flag", buf2, sizeof(buf2));
+		Q_strncpy(cached_blueflag, blueflag, sizeof(cached_blueflag) - 1);
+		cached_blueflag[sizeof(cached_blueflag) - 1] = '\0';
+
+		last_cache_time = current_time;
+	}
+
+	if (cached_blueflag[0] != '\0' && cached_redflag[0] != '\0') // is there a key on the server (newer version of crx)
+	{
+		Q_strncpy(cl.flagstatus, "n", sizeof(cl.flagstatus) - 1);
+		cl.flagstatus[sizeof(cl.flagstatus) - 1] = '\0';
 
 		// RED
 
-		if (!strcmp(redflag, "carried"))
-			strncpy(cl.flagstatus, "r", sizeof(cl.flagstatus)); // red taken
+		if (!strcmp(cached_redflag, "carried")) {
+			Q_strncpy(cl.flagstatus, "r", sizeof(cl.flagstatus) - 1);
+			cl.flagstatus[sizeof(cl.flagstatus) - 1] = '\0';
+		}
 
-		if (!strcmp(redflag, "dropped"))
-			strncpy(cl.flagstatus, "x", sizeof(cl.flagstatus)); // red abandoned
+		if (!strcmp(cached_redflag, "dropped")) {
+			Q_strncpy(cl.flagstatus, "x", sizeof(cl.flagstatus) - 1);
+			cl.flagstatus[sizeof(cl.flagstatus) - 1] = '\0';
+		}
 
 		// BLUE
 
-		if (!strcmp(blueflag, "carried"))
-			strncpy(cl.flagstatus, "b", sizeof(cl.flagstatus)); // blue abandoned
+		if (!strcmp(cached_blueflag, "carried")) {
+			Q_strncpy(cl.flagstatus, "b", sizeof(cl.flagstatus) - 1);
+			cl.flagstatus[sizeof(cl.flagstatus) - 1] = '\0';
+		}
 
-		if (!strcmp(blueflag, "dropped"))
-			strncpy(cl.flagstatus, "y", sizeof(cl.flagstatus)); // blue abandoned
+		if (!strcmp(cached_blueflag, "dropped")) {
+			Q_strncpy(cl.flagstatus, "y", sizeof(cl.flagstatus) - 1);
+			cl.flagstatus[sizeof(cl.flagstatus) - 1] = '\0';
+		}
 
 		// RED & BLUE
 
-		if (!strcmp(blueflag, "carried") && !strcmp(redflag, "carried")) // blue & red taken
-			strncpy(cl.flagstatus, "p", sizeof(cl.flagstatus));
+		if (!strcmp(cached_blueflag, "carried") && !strcmp(cached_redflag, "carried")) {
+			Q_strncpy(cl.flagstatus, "p", sizeof(cl.flagstatus) - 1);
+			cl.flagstatus[sizeof(cl.flagstatus) - 1] = '\0';
+		}
 
-		if (!strcmp(blueflag, "dropped") && !strcmp(redflag, "dropped")) // blue & red abandoned
-			strncpy(cl.flagstatus, "z", sizeof(cl.flagstatus));
+		if (!strcmp(cached_blueflag, "dropped") && !strcmp(cached_redflag, "dropped")) {
+			Q_strncpy(cl.flagstatus, "z", sizeof(cl.flagstatus) - 1);
+			cl.flagstatus[sizeof(cl.flagstatus) - 1] = '\0';
+		}
 
-		if (!strcmp(blueflag, "dropped") && !strcmp(redflag, "carried")) // blue abandoned, red taken
-			strncpy(cl.flagstatus, "j", sizeof(cl.flagstatus));
+		if (!strcmp(cached_blueflag, "dropped") && !strcmp(cached_redflag, "carried")) {
+			Q_strncpy(cl.flagstatus, "j", sizeof(cl.flagstatus) - 1);
+			cl.flagstatus[sizeof(cl.flagstatus) - 1] = '\0';
+		}
 
-		if (!strcmp(blueflag, "carried") && !strcmp(redflag, "dropped")) // red abandoned, blue taken
-			strncpy(cl.flagstatus, "k", sizeof(cl.flagstatus));
+		if (!strcmp(cached_blueflag, "carried") && !strcmp(cached_redflag, "dropped")) {
+			Q_strncpy(cl.flagstatus, "k", sizeof(cl.flagstatus) - 1);
+			cl.flagstatus[sizeof(cl.flagstatus) - 1] = '\0';
+		}
 	}
 
 	GL_SetCanvas(CANVAS_TOPRIGHT3);
