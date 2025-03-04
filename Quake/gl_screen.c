@@ -2002,6 +2002,24 @@ static int obs_frags_x;
 static int obs_frags_y;
 static int obs_frags_height;
 static qboolean obs_frags_active;  // Track if the frags list is currently being displayed	
+void Sbar_DrawSubPicAlpha (int x, int y, qpic_t* pic, int ofsx, int ofsy, int w, int h, float alpha);
+
+void getShortName(const char* fullName, char* shortName)
+{
+	// Copy up to the first 15 characters into shortName
+	// Make sure to leave space for the null terminator
+	size_t len = strlen(fullName);
+	size_t copyLen = (len < 15) ? len : 15;
+
+	memcpy(shortName, fullName, copyLen);
+	shortName[copyLen] = '\0';  // Ensure null termination
+
+	// Trim trailing spaces
+	len = copyLen;
+	while (len > 0 && isspace((unsigned char)shortName[len - 1])) {
+		shortName[--len] = '\0';
+	}
+}
 
 /*
 =======================
@@ -2020,12 +2038,39 @@ void SCR_ShowObsFrags(void)
 	const char* obs;
 	const char* star_obs;
 	int clampedSbar = CLAMP(1, (int)scr_sbar.value, 3);
+	static qpic_t* weapon_icons = NULL;
+	static qboolean icons_initialized = false;
+	static qpic_t* sb_quad = NULL;
+	static qpic_t* sb_pent = NULL;
+	static qpic_t* sb_ring = NULL;
+	static qpic_t* sb_key1 = NULL;
+	static qpic_t* sb_key2 = NULL;
+	static qpic_t* sb_sigil[4] = { NULL, NULL, NULL, NULL };
 
 	if (cl.intermission || qeintermission || crxintermission)
 		return;
 
 	if (scr_viewsize.value >= 120)
 		return;
+
+	if (!icons_initialized && cl.modtype == 1 && !cl.notobserver)
+	{
+		if (COM_FileExists("gfx/ibar2.lmp", NULL))
+			weapon_icons = Draw_CachePic("gfx/ibar2.lmp");
+
+		sb_quad = Draw_PicFromWad("sb_quad");
+		sb_pent = Draw_PicFromWad("sb_invuln");
+		sb_ring = Draw_PicFromWad("sb_invis");
+		sb_key1 = Draw_PicFromWad("sb_key1");
+		sb_key2 = Draw_PicFromWad("sb_key2");
+
+		sb_sigil[0] = Draw_PicFromWad("sb_sigil1");
+		sb_sigil[1] = Draw_PicFromWad("sb_sigil2");
+		sb_sigil[2] = Draw_PicFromWad("sb_sigil3");
+		sb_sigil[3] = Draw_PicFromWad("sb_sigil4");
+
+		icons_initialized = true;
+	}
 
 	obs_frags_active = true;
 
@@ -2081,14 +2126,119 @@ void SCR_ShowObsFrags(void)
 
 				// number
 				f = s->frags;
-				sprintf(num, "%3i", f);
+				q_snprintf(num, sizeof(num), "%3i", f);
 				Draw_Character(x + 8, y, num[0]);
 				Draw_Character(x + 16, y, num[1]);
 				Draw_Character(x + 24, y, num[2]);
 
 				// name
-				sprintf(shortname, "%.15s", s->name); // woods only show name, not 'ready' or 'afk' -- 15 characters
+				getShortName(s->name, shortname);
 				M_PrintWhite(x + 50, y, shortname);
+
+				// Only draw items if cl.modtype == 1 and !cl.notobserver
+				if (cl.modtype == 1 && !cl.notobserver)
+				{
+					// Calculate name width for icon placement
+					int nameWidth = strlen(shortname) * 8;
+					int iconX = x + 50 + nameWidth + 4; // 4 pixels padding after name
+					int iconSpacing = 10;
+
+					// Check if player info is recent enough (within 5 seconds)
+					if (s->tinfo.time > cl.time)
+					{
+						// Check for weapons in items
+						qboolean hasRL = (s->tinfo.items & IT_ROCKET_LAUNCHER) != 0;
+						qboolean hasLG = (s->tinfo.items & IT_LIGHTNING) != 0;
+
+						if (weapon_icons)
+						{
+							if (hasRL)
+							{
+								// Draw rocket icon (3rd ammo type in ibar2.lmp)
+								Sbar_DrawSubPicAlpha(iconX - 34, y - 24, weapon_icons, 3 + (2 * 48), 0, 42, 11, 1);
+								iconX += iconSpacing; // Move to next icon position
+							}
+
+							if (hasLG)
+							{
+								// Draw cell icon (4th ammo type in ibar2.lmp)
+								Sbar_DrawSubPicAlpha(iconX - 34, y - 24, weapon_icons, 3 + (3 * 48), 0, 42, 11, 1);
+								iconX += iconSpacing; // Move to next icon position
+							}
+							iconX -= 2;
+						}
+
+						qboolean hasQuad = (s->tinfo.items & IT_QUAD) != 0;
+						qboolean hasPent = (s->tinfo.items & IT_INVULNERABILITY) != 0;
+						qboolean hasRing = (s->tinfo.items & IT_INVISIBILITY) != 0;
+						qboolean hasSilverKey = (s->tinfo.items & IT_KEY1) != 0;
+						qboolean hasGoldKey = (s->tinfo.items & IT_KEY2) != 0;
+
+						qboolean hasSigil1 = (s->tinfo.items & (1 << 23)) != 0;
+						qboolean hasSigil2 = (s->tinfo.items & (1 << 24)) != 0;
+						qboolean hasSigil3 = (s->tinfo.items & (1 << 25)) != 0;
+						qboolean hasSigil4 = (s->tinfo.items & (1 << 26)) != 0;
+
+						float scale = 0.65; // Draw powerup/rune icons with scaling
+
+						if (hasQuad && sb_quad)
+						{
+							Draw_ScaledPic(iconX, y, sb_quad, scale);
+							iconX += iconSpacing;
+						}
+
+						if (hasPent && sb_pent)
+						{
+							Draw_ScaledPic(iconX, y, sb_pent, scale);
+							iconX += iconSpacing;
+						}
+
+						if (hasRing && sb_ring)
+						{
+							Draw_ScaledPic(iconX, y, sb_ring, scale);
+							iconX += iconSpacing;
+						}
+
+						if (hasSilverKey && sb_key1)
+						{
+							Draw_ScaledPic(iconX, y, sb_key1, scale);
+							iconX += iconSpacing;
+						}
+
+						if (hasGoldKey && sb_key2)
+						{
+							Draw_ScaledPic(iconX, y, sb_key2, scale);
+							iconX += iconSpacing;
+						}
+
+						if (hasSigil1 || hasSigil2 || hasSigil3 || hasSigil4)
+							iconX += 1;
+
+						// Draw runes
+						if (hasSigil1 && sb_sigil[0])
+						{
+							Draw_ScaledPic(iconX, y, sb_sigil[0], scale);
+							iconX += iconSpacing;
+						}
+
+						if (hasSigil2 && sb_sigil[1])
+						{
+							Draw_ScaledPic(iconX, y, sb_sigil[1], scale);
+							iconX += iconSpacing;
+						}
+
+						if (hasSigil3 && sb_sigil[2])
+						{
+							Draw_ScaledPic(iconX, y, sb_sigil[2], scale);
+							iconX += iconSpacing;
+						}
+
+						if (hasSigil4 && sb_sigil[3])
+						{
+							Draw_ScaledPic(iconX, y, sb_sigil[3], scale);
+						}
+					}
+				}
 			}
 			obs_frags_active = true;
 		}
