@@ -1677,89 +1677,136 @@ int divide_round_up(int a, int b) // woods #capturediff
 }
 
 /*====================
-SCR_DrawMatchScores   -- woods  (Adapted from Sbar_DrawFrags from r00k) -- draw match scores upper right corner #matchhud
-====================++
-*/
-void SCR_DrawMatchScores(void)
+SCR_CalculateTeamScoresForDemo -- woods - calculate team scores for demo playback #matchhud
+====================*/
+void SCR_CalculateTeamScoresForDemo(int* team_colors, int* team_scores, int* num_teams, int* redteamplayers, int* blueteamplayers)
 {
-	int				i, k, l;
-	int				top, bottom;
-	int				x, y, f;
-	char			num[30];
-	int				teamscores, colors;// JPG - added these
-	int				ts1, ts2, tc1, tc2, diff, l2; // woods #hud_diff
-	char			tcolor[12]; // woods #hud_diff
-	scoreboard_t* s; // woods #hud_diff
-	int				totalteamplayers, redteamplayers, blueteamplayers, capturepoints, capdiff; // woods #capturediff
+	int i, j, k, colors;
+	scoreboard_t* s;
 
-	if (scr_viewsize.value >= 130)
-		return;
+	// Initialize arrays
+	memset(team_colors, 0, sizeof(int) * MAX_SCOREBOARD);
+	memset(team_scores, 0, sizeof(int) * MAX_SCOREBOARD);
+	*num_teams = 0;
+	*redteamplayers = 0;
+	*blueteamplayers = 0;
 
-	// JPG - check to see if we should sort teamscores instead
-	teamscores = /*pq_teamscores.value && */cl.teamgame;
+	Sbar_SortFrags();
 
-	if (teamscores)    // display frags if it's a teamgame match
-		Sbar_SortTeamFrags();
-	else
-		return;
+	// First pass: identify all team colors
+	for (i = 0; i < scoreboardlines; i++) {
+		k = fragsort[i];
+		s = &cl.scores[k];
 
-	// draw the text
-	l = scoreboardlines <= 4 ? scoreboardlines : 4;
+		if (!s->name[0])
+			continue;
 
-	x = 0;
-	y = 0; // woods to position vertical
-	redteamplayers = 0;
-	blueteamplayers = 0;
-	totalteamplayers = 0;
-	capturepoints = 0;
-	capdiff = 0;
+		colors = s->pants.basic;
 
-	if (cl.gametype == GAME_DEATHMATCH)
-	{
-		GL_SetCanvas(CANVAS_TOPRIGHT3);
+		// Skip white (color 0)
+		if (colors == 0)
+			continue;
 
-		char buf[10];
+		// Check if we've seen this team color before
+		int found = 0;
+		for (j = 0; j < *num_teams; j++) {
+			if (team_colors[j] == colors) {
+				found = 1;
+				break;
+			}
+		}
 
-		const char* uiplaymode;
-		uiplaymode = Info_GetKey(cl.scores[cl.realviewentity - 1].userinfo, "mode", buf, sizeof(buf)); // userinfo (qecrx)
+		if (!found && *num_teams < MAX_SCOREBOARD) {
+			team_colors[(*num_teams)++] = colors;
+		}
 
-		if (!q_strcasecmp(uiplaymode, "ffa"))
-			return;
+		// Count players for each team color for CTF calculations
+		if (colors == 4) // red team
+			(*redteamplayers)++;
+		else if (colors == 13) // blue team
+			(*blueteamplayers)++;
+	}
 
-		if (cl.modetype == 3) // no teamscores for crx ra
-			return;
+	// Second pass: sum up frags for each team
+	for (i = 0; i < scoreboardlines; i++) {
+		k = fragsort[i];
+		s = &cl.scores[k];
 		
-		if (scr_match_hud.value)   // woods for console var off and on
+		if (!s->name[0])
+			continue;
+
+		colors = s->pants.basic;
+
+		// Skip white (color 0)
+		if (colors == 0)
+			continue;
+
+		// Add this player's frags to their team's total
+		for (j = 0; j < *num_teams; j++) {
+			if (team_colors[j] == colors) {
+				team_scores[j] += s->frags;
+				break;
+			}
+		}
+	}
+
+	// Sort teams by score (bubble sort)
+	for (i = 0; i < *num_teams - 1; i++) {
+		for (j = 0; j < *num_teams - i - 1; j++) {
+			if (team_scores[j] < team_scores[j + 1]) {
+				// Swap scores
+				int temp_score = team_scores[j];
+				team_scores[j] = team_scores[j + 1];
+				team_scores[j + 1] = temp_score;
+
+				// Swap colors
+				int temp_color = team_colors[j];
+				team_colors[j] = team_colors[j + 1];
+				team_colors[j + 1] = temp_color;
+			}
+		}
+	}
+}
+
+/*====================
+SCR_DrawTeamScores -- woods - draw the team scores in the upper right corner #matchhud
+====================*/
+int SCR_DrawTeamScores(int x, int y, int l, qboolean use_demo_calculation, int* team_colors, int* team_scores)
 		{
-			if (cl.teamcolor[0])
+	int i, k, colors, f;
+	int top, bottom;
+	char num[30];
+
+	if (cl.teamcolor[0] || (use_demo_calculation && team_colors[0]))
 				Draw_Fill(11, 1, 32, 18, 0, 0.3);  // rectangle for missing team
 
 			for (i = 0; i < l; i++)
 			{
+		// Get team color and score based on calculation method
+		if (use_demo_calculation) {
+			colors = team_colors[i];
+			f = team_scores[i];
+		}
+		else {
 				k = fragsort[i];
-
-				// JPG - check for teamscores
-				if (teamscores)
-				{
 					colors = cl.teamscores[k].colors;
 					f = cl.teamscores[k].frags;
+		}
+
+		// Store for diff calculation
 					cl.teamscore[i] = f;
 					cl.teamcolor[i] = colors;
-				}
-				else
-					return;
 
 				// draw background
-				if (teamscores)
-				{
+		if (use_demo_calculation) {
+			top = colors << 4;
+			bottom = colors << 4;
+		}
+		else {
 					top = (colors & 15) << 4;
 					bottom = (colors & 15) << 4;
 				}
-				else
-				{
-					top = colors & 0xf0;
-					bottom = (colors & 15) << 4;
-				}
+
 				top = Sbar_ColorForMap(top);
 				bottom = Sbar_ColorForMap(bottom);
 
@@ -1775,17 +1822,28 @@ void SCR_DrawMatchScores(void)
 				Sbar_DrawCharacter(((x + 2) * 8) + 7, y - 23, num[1]);
 				Sbar_DrawCharacter(((x + 3) * 8) + 7, y - 23, num[2]);
 
-				x += 0;
 				y += 9;  // woods to position vertical
 			}
 
-			// woods #hud_diff display point differential
+	return y; // Return the updated y position
+}
 
-			if (!cl.teamcolor[2]) // only for two colors
+/*====================
+SCR_DrawTeamDifferential -- woods - draw the team differential display #capturediff #matchhud
+====================*/
+void SCR_DrawTeamDifferential(int y, qboolean use_demo_calculation, int redteamplayers, int blueteamplayers, int l)
 			{
-				for (i = 0; i < l; i++)
-				{
-					k = fragsort[i];
+	int i, k, l2, ts1, ts2, tc1, tc2, diff;
+	int totalteamplayers = 0, capturepoints = 0, capdiff = 0;
+	char tcolor[12];
+	char num[30];
+	char buf[10];
+	const char* val;
+	qboolean is_ctf = false;
+	scoreboard_t* s;
+
+	if (cl.teamcolor[2]) // only for two colors
+		return;
 
 					ts1 = cl.teamscore[0]; // high score
 					ts2 = cl.teamscore[1]; // low score
@@ -1794,10 +1852,21 @@ void SCR_DrawMatchScores(void)
 					tc1 = cl.teamcolor[0]; // top score [color]
 					tc2 = cl.teamcolor[1]; // bottom score [color]
 
-					// lets get YOUR team color from scoreboard
+	// Check if this is CTF mode
+	is_ctf = (cl.modetype == 1);
 
+	// Also check serverinfo for CTF by looking for the "red flag" key
+	val = Info_GetKey(cl.serverinfo, "red flag", buf, sizeof(buf));
+	if (val && *val) {  // If key exists and has any value
+		is_ctf = true;
+	}
+
+	// lets get YOUR team color from scoreboard
+	if (!use_demo_calculation) {
 					Sbar_SortFrags();
 					l2 = scoreboardlines;
+		redteamplayers = 0;
+		blueteamplayers = 0;
 
 					for (i = 0; i < l2; i++)
 					{
@@ -1811,21 +1880,28 @@ void SCR_DrawMatchScores(void)
 						}
 
 						// woods, lets see how many players are on each team #capturediff
-
 						if (s->pants.basic == 4) // count number of red players
 							redteamplayers += 1;
 
 						if (s->pants.basic == 13) // count number of blue players
 							blueteamplayers += 1;
+		}
+	}
+	else {
+		// For demo playback, get the player's team color
+		s = &cl.scores[cl.viewentity - 1];
+		if (s->name[0]) {
+			sprintf(tcolor, "%u", s->pants.basic);
+		}
+		// Note: redteamplayers and blueteamplayers were already counted above
+	}
 
 						if (redteamplayers == blueteamplayers) // equal teams? 3 vs 3 not 2 vs 1
 							totalteamplayers = blueteamplayers;
 						else
 							totalteamplayers = 0;
-					}
 
 					// woods, lets do some ctf math! #capturediff
-
 					capturepoints = (totalteamplayers * 10) + 5; // capture 10 and +5 for cap
 					if (diff != 0 && capturepoints != 0)
 						capdiff = divide_round_up(diff, capturepoints); // how many ctf captures up or down
@@ -1833,11 +1909,11 @@ void SCR_DrawMatchScores(void)
 					GL_SetCanvas(CANVAS_TOPRIGHT4); // lets do some printing
 
 					if ((ts1 == ts2) || (l < 2)) // don't show ties, l = # of teams
-						continue;
+		return;
 
 					else if ((atoi(tcolor) == tc1) || atoi(tcolor) == (tc1/17))// top score [color] is the same as your color
 					{
-						if (totalteamplayers && cl.modetype == 1) // equal teams and CTF
+		if (totalteamplayers && ((cl.modetype == 1) || is_ctf)) // equal teams and CTF
 							snprintf(num, sizeof(num), "+%-i (%i)", diff, capdiff);
 						else
 							snprintf(num, sizeof(num), "+%-i", diff);
@@ -1847,18 +1923,77 @@ void SCR_DrawMatchScores(void)
 
 					else if ((atoi(tcolor) == tc2) || atoi(tcolor) == (tc2 / 17)) // bottom score [color] is the same as your color
 					{
-						if (totalteamplayers && cl.modetype == 1) // equal teams and CTF
+		if (totalteamplayers && ((cl.modetype == 1) || is_ctf)) // equal teams and CTF
 							snprintf(num, sizeof(num), "-%-i (%i)", diff, capdiff);
 						else
 							snprintf(num, sizeof(num), "-%-i", diff);
 						M_Print(120 - (strlen(num) << 3), y + 20, num);
 					}				
 				}
+
+/*====================
+SCR_DrawMatchScores   -- woods  (Adapted from Sbar_DrawFrags from r00k) -- draw match scores upper right corner #matchhud
+====================*/
+void SCR_DrawMatchScores(void)
+{
+	int team_colors[MAX_SCOREBOARD]; // For demo calculation
+	int team_scores[MAX_SCOREBOARD]; // For demo calculation
+	int num_teams = 0;               // For demo calculation
+	int redteamplayers = 0, blueteamplayers = 0;
+	int x, y, l;
+	qboolean use_demo_calculation = false;
+	int teamscores;
+	char buf[10];
+	const char* uiplaymode;
+
+	if (scr_viewsize.value >= 130)
+		return;
+
+	// Check if we need to calculate team scores manually (for demos)
+	if (cls.demoplayback && (!cl.teamscores[0].colors || !cl.teamscores[1].colors)) {
+		use_demo_calculation = true;
 			}
+
+	// Only proceed if it's a team game
+	teamscores = cl.teamgame;
+	if (!teamscores)
+		return;
+
+	// For regular games, sort team frags
+	if (!use_demo_calculation) {
+		Sbar_SortTeamFrags();
+		}
+	// For demos, calculate team scores manually
+	else {
+		SCR_CalculateTeamScoresForDemo(team_colors, team_scores, &num_teams, &redteamplayers, &blueteamplayers);
+	}
+
+	// draw the text
+	l = use_demo_calculation ?
+		(num_teams <= 4 ? num_teams : 4) :
+		(scoreboardlines <= 4 ? scoreboardlines : 4);
+
+	x = 0;
+	y = 0; // woods to position vertical
+
+	if (cl.gametype == GAME_DEATHMATCH)
+	{
+		GL_SetCanvas(CANVAS_TOPRIGHT3);
+
+		uiplaymode = Info_GetKey(cl.scores[cl.realviewentity - 1].userinfo, "mode", buf, sizeof(buf)); // userinfo (qecrx)
+
+		if (!q_strcasecmp(uiplaymode, "ffa"))
+		return;
+
+		if (cl.modetype == 3) // no teamscores for crx ra
+			return;
+
+		if (scr_match_hud.value)   // woods for console var off and on
+		{
+			y = SCR_DrawTeamScores(x, y, l, use_demo_calculation, team_colors, team_scores);
+			SCR_DrawTeamDifferential(y, use_demo_calculation, redteamplayers, blueteamplayers, l);
 		}
 	}
-	else
-		return;
 }
 
 // woods #eyemouse
