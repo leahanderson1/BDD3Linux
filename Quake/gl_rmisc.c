@@ -46,6 +46,8 @@ extern cvar_t r_lerpmodels;
 extern cvar_t r_lerpmove;
 extern cvar_t r_nolerp_list;
 extern cvar_t r_noshadow_list;
+extern cvar_t r_nooutline_list; // woods #routline
+extern cvar_t r_outline; // woods #routline
 //johnfitz
 extern cvar_t r_scenecache;
 extern cvar_t gl_zfix; // QuakeSpasm z-fighting fix
@@ -359,6 +361,8 @@ void R_Init (void)
 	Cvar_SetCallback (&r_nolerp_list, R_Model_ExtraFlags_List_f);
 	Cvar_RegisterVariable (&r_noshadow_list);
 	Cvar_SetCallback (&r_noshadow_list, R_Model_ExtraFlags_List_f);
+	Cvar_RegisterVariable(&r_nooutline_list); // woods #routline
+	Cvar_RegisterVariable(&r_outline); // woods #routline
 	//johnfitz
 	//spike -- new cvars...
 	Cvar_RegisterVariable (&r_scenecache);

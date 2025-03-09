@@ -4845,7 +4845,7 @@ Graphics Menu
 ==================
 */
 
-extern cvar_t r_particles, gl_load24bit, r_replacemodels, r_lerpmodels, r_lerpmove, r_scale,
+extern cvar_t r_particles, gl_load24bit, r_replacemodels, r_lerpmodels, r_lerpmove, r_scale, r_outline,
 vid_gamma, vid_contrast, vid_fsaa, r_particledesc, gl_loadlitfiles, r_rocketlight, r_explosionlight;
 
 static enum graphics_e
@@ -4865,6 +4865,7 @@ static enum graphics_e
 	GRAPHICS_COLOREDLIGHTING,    // Added
 	GRAPHICS_ALIASSHADOW,
 	GRAPHICS_BRUSHSHADOW,
+	GRAPHICS_MODELOUTLINES,
 	GRAPHICS_COUNT
 } graphics_cursor;
 
@@ -4916,6 +4917,8 @@ static const char* M_Graphics_GetItemText(int index)
 		return "Custom Particles";
 	case GRAPHICS_COLOREDLIGHTING:
 		return "Colored Lighting";
+	case GRAPHICS_MODELOUTLINES:
+		return "Model Outlines";
 	default:
 		q_snprintf(buffer, sizeof(buffer), "Unknown Item %d", index);
 		return buffer;
@@ -5081,6 +5084,12 @@ static void M_Graphics_AdjustSliders(int dir)
 	case GRAPHICS_COLOREDLIGHTING:
 		Cvar_SetValue("gl_loadlitfiles", !gl_loadlitfiles.value);
 		break;
+
+	case GRAPHICS_MODELOUTLINES:
+		f = r_outline.value + dir;
+		f = CLAMP(0, f, 5);
+		Cvar_SetValue("r_outline", f);
+		break;
 	}
 }
 
@@ -5211,6 +5220,13 @@ void M_Graphics_Draw(void)
 			text = "  Colored Lighting";
 			M_DrawCheckbox(178, y, gl_loadlitfiles.value != 0);
 			break;
+
+		case GRAPHICS_MODELOUTLINES:
+			text = "    Model Outlines";
+			r = r_outline.value / 5.0; // Normalize to 0-1 range for slider (max value is 5)
+			M_DrawSlider(186, y, r, r_outline.value, "%.0f");
+			break;
+
 		default:
 			break;
 		}
@@ -5360,7 +5376,8 @@ void M_Graphics_Key(int k)
 				graphics_cursor == GRAPHICS_CONTRAST ||
 				graphics_cursor == GRAPHICS_ALIASSHADOW ||
 				graphics_cursor == GRAPHICS_ROCKETLIGHT ||
-				graphics_cursor == GRAPHICS_EXPLOSIONLIGHT)
+				graphics_cursor == GRAPHICS_EXPLOSIONLIGHT ||
+				graphics_cursor == GRAPHICS_MODELOUTLINES)
 			{
 				graphics_slider_grab = true;
 			}
@@ -5441,6 +5458,11 @@ void M_Graphics_Mousemove(int cx, int cy)
 		case GRAPHICS_EXPLOSIONLIGHT:
 			f = M_MouseToSliderFraction(cx - 187) * 100;
 			Cvar_SetValue("r_explosionlight", CLAMP(0, f, 100));
+			break;
+
+		case GRAPHICS_MODELOUTLINES:
+			f = M_MouseToSliderFraction(cx - 187) * 5;
+			Cvar_SetValue("r_outline", CLAMP(0, f, 5));
 			break;
 
 			// Add empty cases for all other enum values to suppress warnings

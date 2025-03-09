@@ -117,6 +117,8 @@ cvar_t	r_lerpmodels = {"r_lerpmodels", "1", CVAR_ARCHIVE};
 cvar_t	r_lerpmove = {"r_lerpmove", "1", CVAR_ARCHIVE};
 cvar_t	r_nolerp_list = {"r_nolerp_list", "progs/flame.mdl,progs/flame2.mdl,progs/braztall.mdl,progs/brazshrt.mdl,progs/longtrch.mdl,progs/flame_pyre.mdl,progs/v_saw.mdl,progs/v_xfist.mdl,progs/h2stuff/newfire.mdl", CVAR_ARCHIVE};
 cvar_t	r_noshadow_list = {"r_noshadow_list", "progs/flame2.mdl,progs/flame.mdl,progs/bolt1.mdl,progs/bolt2.mdl,progs/bolt3.mdl,progs/laser.mdl", CVAR_ARCHIVE};
+cvar_t	r_nooutline_list = {"r_nooutline_list", "progs/bolt1.mdl,progs/bolt2.mdl,progs/bolt3.mdl,progs/bit.mdl, progs/star.mdl", CVAR_ARCHIVE}; // woods #routline
+cvar_t	r_outline = {"r_outline", "0", CVAR_ARCHIVE}; // woods #routline
 
 extern cvar_t	r_vfog;
 //johnfitz

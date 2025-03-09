@@ -29,8 +29,13 @@ extern cvar_t scr_fov, cl_gun_fovscale; // woods #zoom (ironwail)
 extern cvar_t r_coloredpowerupglow; // woods
 extern cvar_t gl_overbright_models_alpha; // woods #obmodelslist
 extern cvar_t gl_overbright_models_list; // woods #obmodelslist
+extern cvar_t r_outline; // woods #obmodelslist #routline
+extern cvar_t r_nooutline_list; // woods #routline
 
-qboolean nameInList(const char* list, const char* name); // woods #obmodelslist
+extern qboolean nameInList(const char* list, const char* name); // woods #obmodelslist #routline
+extern qboolean TP_IsPlayerVisible(vec3_t origin); // woods #routline
+extern qboolean IsOneVsOneMatch(void); // woods #routline
+void Matrix3x4_RM_Transform4(const float* matrix, const float* vector, float* product); // woods #routline
 
 cvar_t	gl_lightning_alpha = {"gl_lightning_alpha","1"}; // woods #lightalpha
 
@@ -99,6 +104,9 @@ typedef struct
 	GLuint useOverbrightLoc;
 	GLuint useAlphaTestLoc;
 	GLuint colorTintLoc;
+	GLuint outlineWidthLoc; // woods #routline
+	GLuint isOutlinePassLoc; // woods #routline
+	GLuint outlineColorLoc; // woods #routline
 } aliasglsl_t;
 static aliasglsl_t r_alias_glsl[ALIAS_GLSL_MODES];
 
@@ -185,6 +193,8 @@ void GLAlias_CreateShaders (void)
 		"\n"
 		"uniform vec3 ShadeVector;\n"
 		"uniform vec4 LightColor;\n"
+		"uniform float outlineWidth; // Amount to expand vertices\n" // woods #routline
+		"uniform bool isOutlinePass; // Indicates if this is the outline pass\n" // woods #routline
 		"attribute vec4 TexCoords; // only xy are used \n"
 		"attribute vec4 Pose1Vert;\n"
 		"attribute vec3 Pose1Normal;\n"
@@ -215,6 +225,10 @@ void GLAlias_CreateShaders (void)
 		"void main()\n"
 		"{\n"
 		"	gl_TexCoord[0] = TexCoords;\n"
+		"\n"
+		"	vec4 lerpedVert;\n" // woods #routline
+		"	vec3 lerpedNormal;\n" // woods #routline
+		"\n"
 		"#ifdef SKELETAL\n"
 		"	mat4 wmat;"
 		"	wmat[0]  = BoneTable[0+3*int(BoneIndex.x)] * BoneWeight.x;"
@@ -230,11 +244,38 @@ void GLAlias_CreateShaders (void)
 		"	wmat[2] += BoneTable[2+3*int(BoneIndex.z)] * BoneWeight.z;"
 		"	wmat[2] += BoneTable[2+3*int(BoneIndex.w)] * BoneWeight.w;"
 		"	wmat[3] = vec4(0.0,0.0,0.0,1.0);\n"
-		"	vec4 lerpedVert = (vec4(Pose1Vert.xyz, 1.0) * wmat);\n"
 		"	float dot1 = r_avertexnormal_dot(normalize((vec4(Pose1Normal.xyz, 0.0) * wmat).xyz));\n"
+		"\n"
+		"	// Transform the vertex position\n" // woods #routline
+		"	vec4 basePos = (vec4(Pose1Vert.xyz, 1.0) * wmat);\n"
+		"	vec3 transformedNormal = normalize((vec4(Pose1Normal.xyz, 0.0) * wmat).xyz);\n"
+		"\n"
+		"	float outlineScale = 1.0;\n"
+		"	if (isOutlinePass && outlineWidth > 0.0)\n"
+		"	{\n"
+		"		// Add the scaled normal for outline\n"
+		"		lerpedVert = basePos + vec4(transformedNormal * outlineWidth * outlineScale, 0.0);\n"
+		"	}\n"
+		"	else\n"
+		"	{\n"
+		"		lerpedVert = basePos;\n"
+		"	}\n"
+		"\n"
 		"#else\n"
-		"	vec4 lerpedVert = mix(vec4(Pose1Vert.xyz, 1.0), vec4(Pose2Vert.xyz, 1.0), Blend);\n"
+		"	// Vertex position interpolation\n" // woods #routline
+		"	lerpedVert = mix(vec4(Pose1Vert.xyz, 1.0), vec4(Pose2Vert.xyz, 1.0), Blend);\n"
 		"	float dot1 = mix(r_avertexnormal_dot(Pose1Normal), r_avertexnormal_dot(Pose2Normal), Blend);\n"
+		"\n"
+		" 	// Normal interpolation\n" // woods #routline
+		"	lerpedNormal = mix(Pose1Normal, Pose2Normal, Blend);\n"
+		"	lerpedNormal = normalize(lerpedNormal);\n"
+		"\n"
+		"	// Apply outline expansion if in the outline pass\n" // woods #routline
+		"	if (isOutlinePass && outlineWidth > 0.0)\n"
+		"	{\n"
+		"		lerpedVert.xyz += lerpedNormal * outlineWidth;\n"
+		"	}\n"
+		"\n"
 		"#endif\n"
 		"	gl_Position = gl_ModelViewProjectionMatrix * lerpedVert;\n"
 		"	FogFragCoord = gl_Position.w;\n"
@@ -255,11 +296,20 @@ void GLAlias_CreateShaders (void)
 		"uniform bool UseOverbright;\n"
 		"uniform bool UseAlphaTest;\n"
 		"uniform vec4 ColourTint[3];\n"	//base+bot+top+fb
+		"uniform bool isOutlinePass;      // Indicates if this is the outline pass\n" // woods #routline
+		"uniform vec4 outlineColor;       // Color to use for the outline\n" // woods #routline
 		"\n"
 		"varying float FogFragCoord;\n"
 		"\n"
 		"void main()\n"
 		"{\n"
+		"    if (isOutlinePass)\n" // woods #routline
+		"    {\n"
+		"        // Render the outline with a solid color\n"
+		"        gl_FragColor = outlineColor;\n"
+		"        return;\n"
+		"    }\n"
+		"\n"
 		"	vec4 result = texture2D(Tex, gl_TexCoord[0].xy);\n"	//base
 		"	if (ColourTint[0].a != 0.0) result.rgb += texture2D(LowerTex, gl_TexCoord[0].xy).rgb * ColourTint[0].rgb;\n"	//team/lower/trousers
 		"	if (ColourTint[1].a != 0.0) result.rgb += texture2D(UpperTex, gl_TexCoord[0].xy).rgb * ColourTint[1].rgb;\n"	//personal/upper/torso
@@ -323,15 +373,286 @@ void GLAlias_CreateShaders (void)
 			glsl->useAlphaTestLoc = GL_GetUniformLocation (&glsl->program, "UseAlphaTest");
 			glsl->colorTintLoc = GL_GetUniformLocation (&glsl->program, "ColourTint");
 
+			glsl->outlineWidthLoc = GL_GetUniformLocation (&glsl->program, "outlineWidth"); // woods #routline
+			glsl->isOutlinePassLoc = GL_GetUniformLocation (&glsl->program, "isOutlinePass"); // woods #routline
+			glsl->outlineColorLoc = GL_GetUniformLocation (&glsl->program, "outlineColor"); // woods #routline
+
 			//we can do this here, its not going to change.
 			GL_UseProgramFunc (glsl->program);
 			GL_Uniform1iFunc (glsl->texLoc, 0);
 			GL_Uniform1iFunc (glsl->fullbrightTexLoc, 1);
 			GL_Uniform1iFunc (glsl->lowerTexLoc, 2);
 			GL_Uniform1iFunc (glsl->upperTexLoc, 3);
+			GL_Uniform1iFunc (glsl->outlineWidthLoc, 0.0f); // woods #routline
+			GL_Uniform1iFunc (glsl->isOutlinePassLoc, 0); // woods #routline
 			GL_UseProgramFunc (0);
 		}
 	}
+}
+
+/*
+=============
+R_CalculateAliasModelOutlineWidth -- woods #routline
+=============
+*/
+float R_CalculateAliasModelOutlineWidth(aliashdr_t* paliashdr, entity_t* e, lerpdata_t* lerpdata)
+{
+	if (r_outline.value <= 0 ||
+		cl.viewent.model == e->model ||
+		nameInList(r_nooutline_list.string, e->model->name))
+		return 0.0f;
+
+	float radius;
+	maliasframedesc_t* frame = &paliashdr->frames[e->frame];
+
+	// Calculate radius based on model format
+	switch (paliashdr->poseverttype)
+	{
+	case PV_QUAKE3:  // MD3 format
+	{
+		// Calculate current frame offset
+		int frameOffset = frame->firstpose * paliashdr->numverts;
+		meshxyz_md3_t* verts = (meshxyz_md3_t*)((byte*)paliashdr + paliashdr->vertexes + (frameOffset * sizeof(meshxyz_md3_t)));
+
+		// Find maximum vertex distance
+		float maxDist = 0.0f;
+		for (int i = 0; i < paliashdr->numverts; i++)
+		{
+			// MD3 vertices are stored as signed shorts, scaled by 1/64
+			float x = (float)verts[i].xyz[0] * (1.0f / 64.0f);
+			float y = (float)verts[i].xyz[1] * (1.0f / 64.0f);
+			float z = (float)verts[i].xyz[2] * (1.0f / 64.0f);
+
+			// Apply model scale (MD3 models typically use this scale)
+			x *= paliashdr->scale[0];
+			y *= paliashdr->scale[1];
+			z *= paliashdr->scale[2];
+
+			float dist = sqrt(x * x + y * y + z * z);
+			if (dist > maxDist)
+				maxDist = dist;
+		}
+		radius = maxDist;
+		break;
+	}
+
+	case PV_IQM:
+	{
+		// Check if this is an MD5 model
+		const iqmvert_t* verts = (const iqmvert_t*)((byte*)paliashdr + paliashdr->vertexes);
+		qboolean isMD5 = true;
+
+		// Check if this is an MD5 model by examining weight sums
+		for (int i = 0; i < paliashdr->numverts && isMD5; i++)
+		{
+			float weightSum = 0;
+			for (int j = 0; j < 4; j++)
+			{
+				weightSum += verts[i].weight[j];
+			}
+			// MD5 weights always sum to exactly 1.0
+			if (fabs(weightSum - 1.0f) > 0.001f)
+			{
+				isMD5 = false;
+			}
+		}
+
+		if (isMD5)
+			return 0.0f; // Disable outlines for MD5 models
+
+		// For non-MD5 IQM models, calculate radius
+		float maxDist = 0.0f;
+		if (lerpdata->bonestate)
+		{
+			// For animated models, transform vertices by bones
+			for (int i = 0; i < paliashdr->numverts; i++)
+			{
+				vec3_t transformedVert = { 0, 0, 0 };
+
+				// Transform vertex by weighted bones
+				for (int j = 0; j < 4; j++)
+				{
+					if (verts[i].weight[j] > 0.0f)
+					{
+						vec3_t pos;
+						Matrix3x4_RM_Transform4(lerpdata->bonestate[verts[i].idx[j]].mat,
+							verts[i].xyz,
+							pos);
+						VectorMA(transformedVert, verts[i].weight[j], pos, transformedVert);
+					}
+				}
+
+				// Standard IQM scaling
+				float scaledVert[3];
+				scaledVert[0] = transformedVert[0] * paliashdr->scale[0];
+				scaledVert[1] = transformedVert[1] * paliashdr->scale[1];
+				scaledVert[2] = transformedVert[2] * paliashdr->scale[2];
+
+				float dist = sqrt(scaledVert[0] * scaledVert[0] +
+					scaledVert[1] * scaledVert[1] +
+					scaledVert[2] * scaledVert[2]);
+				maxDist = q_max(maxDist, dist);
+			}
+		}
+
+		radius = maxDist;
+		break;
+	}
+
+	case PV_QUAKE1:  // Standard MDL format
+	default:
+	{
+		if (paliashdr->boundingradius > 0)
+		{
+			radius = paliashdr->boundingradius;
+		}
+		else
+		{
+			trivertx_t* verts = (trivertx_t*)((byte*)paliashdr + paliashdr->vertexes);
+			verts += frame->firstpose * paliashdr->numverts;
+
+			float maxDist = 0.0f;
+			for (int i = 0; i < paliashdr->numverts; i++)
+			{
+				float dx = verts[i].v[0] * paliashdr->scale[0] + paliashdr->scale_origin[0];
+				float dy = verts[i].v[1] * paliashdr->scale[1] + paliashdr->scale_origin[1];
+				float dz = verts[i].v[2] * paliashdr->scale[2] + paliashdr->scale_origin[2];
+				float dist = sqrt(dx * dx + dy * dy + dz * dz);
+				maxDist = q_max(maxDist, dist);
+			}
+			radius = maxDist;
+		}
+		break;
+	}
+	}
+
+	float modelScale = 50.0f / q_max(radius, 1.0f);
+	float finalScale = modelScale / 1.5;
+	float cvarValue = CLAMP(1.0f, r_outline.value, 5.0f);
+
+	return cvarValue * finalScale;
+}
+
+/*
+=============
+R_BeginAliasOutlineRendering -- woods #routline
+=============
+*/
+void R_BeginAliasOutlineRendering(aliasglsl_t* glsl)
+{
+	// Save the current OpenGL state that we are going to modify
+	glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_POLYGON_BIT);
+
+	glEnable(GL_STENCIL_TEST);
+
+	// Configure stencil to write 1s on the stencil buffer where the model is drawn
+	glStencilFunc(GL_ALWAYS, 1, 0xFF); // Set any stencil to 1
+	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE); // Replace stencil with 1 where rendered
+	glStencilMask(0xFF); // Enable writing to the stencil buffer
+
+	// Enable depth testing and write to depth buffer
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
+
+	// Set uniforms for the main model pass (no outline)
+	GL_Uniform1fFunc(glsl->outlineWidthLoc, 0.0f); // No outline expansion
+	GL_Uniform1iFunc(glsl->isOutlinePassLoc, 0);
+}
+
+/*
+=============
+R_DrawAliasModelOutline -- woods #routline
+=============
+*/
+void R_DrawAliasModelOutline(aliasglsl_t* glsl, aliashdr_t* paliashdr, lerpdata_t* lerpdata, entity_t* e)
+{
+	if (!(r_outline.value > 0 &&
+		!(cl.viewent.model == e->model) &&
+		!(nameInList(r_nooutline_list.string, e->model->name))))
+		return;
+
+	float outlineWidth = R_CalculateAliasModelOutlineWidth(paliashdr, e, lerpdata);
+
+	if (outlineWidth <= 0.0f)
+		return;
+
+	// Configure stencil to only draw where stencil is not set by the model
+	glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // Pass test where stencil is not 1
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP); // Keep the stencil buffer unchanged
+	glStencilMask(0x00); // Disable writing to the stencil buffer
+
+	// Disable depth writing to prevent depth buffer modifications
+	glDepthFunc(GL_LEQUAL);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	// Expand the vertices along normals for the outline
+	GL_Uniform1iFunc(glsl->isOutlinePassLoc, 1);
+	GL_Uniform1fFunc(glsl->outlineWidthLoc, outlineWidth);
+	float outlineColor[4] = { 0.0f, 0.0f, 0.0f, entalpha }; // Outline color
+
+	if (!strcmp(e->model->name, "progs/flag.mdl") && e->skinnum == 0)
+	{
+		outlineColor[0] = 1.0f; // Change red component
+		outlineColor[3] = 0.2f; // Change alpha component
+	}
+	else if (!strcmp(e->model->name, "progs/flag.mdl") && e->skinnum == 1)
+	{
+		outlineColor[2] = 1.0f; // Change blue component
+		outlineColor[3] = 0.2f; // Change alpha component
+	}
+	else if (!strcmp(e->model->name, "progs/quaddama.mdl"))
+	{
+		outlineColor[2] = 1.0f; // Change blue component
+		outlineColor[3] = 0.2f; // Change alpha component
+	}
+	else if (!strcmp(e->model->name, "progs/invulner.mdl"))
+	{
+		outlineColor[0] = 1.0f; // Change red component
+		outlineColor[3] = 0.2f; // Change alpha component
+	}
+	else if (!strcmp(e->model->name, "progs/invisibl.mdl"))
+	{
+		outlineColor[0] = 191.0f / 255.0f; // Change red component
+		outlineColor[1] = 160.0f / 255.0f; // Change green component
+		outlineColor[2] = 2.0f / 255.0f; // Change blue component
+		outlineColor[3] = 0.2f; // Change alpha component
+	}
+
+	GL_Uniform4fvFunc(glsl->outlineColorLoc, 1, outlineColor);
+
+	// Cull front faces to render back-facing triangles
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_FRONT);
+
+	// Render the outline
+	glDrawElements(GL_TRIANGLES, paliashdr->numindexes, GL_UNSIGNED_SHORT,
+		e->model->meshindexesvboptr + paliashdr->eboofs);
+
+	// Reset face culling
+	glCullFace(GL_BACK);
+	glDisable(GL_CULL_FACE);
+
+	// Reset depth mask and stencil mask
+	glDepthMask(GL_TRUE);
+	glStencilMask(0xFF);
+	glDepthRange(0, 1);
+
+	glDisable(GL_BLEND);
+}
+
+/*
+=============
+R_EndAliasOutlineRendering -- woods #routline
+=============
+*/
+void R_EndAliasOutlineRendering(void)
+{
+	// Restore the previous OpenGL state
+	glDisable(GL_STENCIL_TEST);
+	glPopAttrib();
 }
 
 /*
@@ -562,8 +883,13 @@ static void GL_DrawAliasFrame_GLSL (aliasglsl_t *glsl, aliashdr_t *paliashdr, le
 	GL_Uniform1iFunc (glsl->useAlphaTestLoc, (currententity->model->flags & MF_HOLEY) ? 1 : 0);
 	GL_Uniform4fvFunc(glsl->colorTintLoc, countof(tints), tints[0]);	//colourmapping and glowmod.
 
+	R_BeginAliasOutlineRendering(glsl); // woods #routline
+
 // draw
 	glDrawElements (GL_TRIANGLES, paliashdr->numindexes, GL_UNSIGNED_SHORT, currententity->model->meshindexesvboptr+paliashdr->eboofs);
+
+	R_DrawAliasModelOutline(glsl, paliashdr, &lerpdata, e); // woods #routline
+	R_EndAliasOutlineRendering(); // woods #routline
 
 // clean up
 	GL_DisableVertexAttribArrayFunc (texCoordsAttrIndex);
