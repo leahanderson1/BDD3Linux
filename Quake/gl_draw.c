@@ -788,10 +788,10 @@ void Draw_StringRGBA (int x, int y, const char* str, plcolour_t c, float alpha)
 
 /*
 =============
-Draw_ScaledPic -- woods #observerhud #eyemouse
+Draw_ScaledPicAlpha -- woods #observerhud #eyemouse
 =============
 */
-void Draw_ScaledPic (int x, int y, qpic_t* pic, float scale)
+void Draw_ScaledPicAlpha (int x, int y, qpic_t* pic, float scale, float alpha)
 {
 	if (!pic)
 		return;
@@ -808,6 +808,13 @@ void Draw_ScaledPic (int x, int y, qpic_t* pic, float scale)
 	float width = pic->width * scale;
 	float height = pic->height * scale;
 
+	glEnable(GL_BLEND);
+
+	glColor4f(1, 1, 1, alpha);
+
+	glDisable(GL_ALPHA_TEST);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
 	GL_Bind(gl->gltexture);
 	glBegin(GL_QUADS);
 	glTexCoord2f(gl->sl, gl->tl);
@@ -819,6 +826,10 @@ void Draw_ScaledPic (int x, int y, qpic_t* pic, float scale)
 	glTexCoord2f(gl->sl, gl->th);
 	glVertex2f(x, y + height);
 	glEnd();
+
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+	glEnable(GL_ALPHA_TEST);
+	glDisable(GL_BLEND);
 }
 
 /*

@@ -2027,6 +2027,8 @@ SCR_ShowObsFrags -- added by woods #observerhud #eyemouse
 =======================
 */
 
+#define OBS_POWERUP_DURATION 30.5f
+
 void SCR_ShowObsFrags(void)
 {
 	int	i, k, x, y, f;
@@ -2173,6 +2175,7 @@ void SCR_ShowObsFrags(void)
 						qboolean hasRing = (s->tinfo.items & IT_INVISIBILITY) != 0;
 						qboolean hasSilverKey = (s->tinfo.items & IT_KEY1) != 0;
 						qboolean hasGoldKey = (s->tinfo.items & IT_KEY2) != 0;
+						qboolean hasMega = (s->tinfo.items & IT_SUPERHEALTH) != 0;
 
 						qboolean hasSigil1 = (s->tinfo.items & (1 << 23)) != 0;
 						qboolean hasSigil2 = (s->tinfo.items & (1 << 24)) != 0;
@@ -2181,33 +2184,88 @@ void SCR_ShowObsFrags(void)
 
 						float scale = 0.65; // Draw powerup/rune icons with scaling
 
+						float quadAlpha = 1.0f;
+						float pentAlpha = 1.0f;
+						float ringAlpha = 1.0f;
+
+						if (hasQuad && s->tinfo.quad_time > 0)
+						{
+							float elapsed = cl.time - s->tinfo.quad_time;
+							if (elapsed <= OBS_POWERUP_DURATION)
+							{
+								quadAlpha = 0.3f + (1.0f - (elapsed / OBS_POWERUP_DURATION)) * 0.7f;
+								if (quadAlpha > 1.0f) quadAlpha = 1.0f;
+							}
+							else
+							{
+								quadAlpha = 0.3f;
+							}
+						}
+
+						if (hasPent && s->tinfo.pent_time > 0)
+						{
+							float elapsed = cl.time - s->tinfo.pent_time;
+							if (elapsed <= OBS_POWERUP_DURATION)
+							{
+								pentAlpha = 0.3f + (1.0f - (elapsed / OBS_POWERUP_DURATION)) * 0.7f;
+								if (pentAlpha > 1.0f) pentAlpha = 1.0f;
+							}
+							else
+							{
+								pentAlpha = 0.3f;
+							}
+						}
+
+						if (hasRing && s->tinfo.ring_time > 0)
+						{
+							float elapsed = cl.time - s->tinfo.ring_time;
+							if (elapsed <= OBS_POWERUP_DURATION)
+							{
+								ringAlpha = 0.3f + (1.0f - (elapsed / OBS_POWERUP_DURATION)) * 0.7f;
+								if (ringAlpha > 1.0f) ringAlpha = 1.0f;
+							}
+							else
+							{
+								ringAlpha = 0.3f;
+							}
+						}
+
 						if (hasQuad && sb_quad)
 						{
-							Draw_ScaledPic(iconX, y, sb_quad, scale);
+							Draw_ScaledPicAlpha(iconX, y, sb_quad, scale, quadAlpha);
 							iconX += iconSpacing;
 						}
 
 						if (hasPent && sb_pent)
 						{
-							Draw_ScaledPic(iconX, y, sb_pent, scale);
+							Draw_ScaledPicAlpha(iconX, y, sb_pent, scale, pentAlpha);
 							iconX += iconSpacing;
 						}
 
 						if (hasRing && sb_ring)
 						{
-							Draw_ScaledPic(iconX, y, sb_ring, scale);
+							Draw_ScaledPicAlpha(iconX, y, sb_ring, scale, ringAlpha);
+							iconX += iconSpacing;
+						}
+
+						if (hasMega)
+						{
+							float megaAlpha = 0.3f + (s->tinfo.health - 101) / 99.0f * 0.7f;
+							if (megaAlpha > 1.0f) megaAlpha = 1.0f;
+
+							Draw_CharacterRGBA(iconX + 1, y + 1, '+' + 128, CL_PLColours_Parse("0xffffff"), megaAlpha);
 							iconX += iconSpacing;
 						}
 
 						if (hasSilverKey && sb_key1)
 						{
-							Draw_ScaledPic(iconX, y, sb_key1, scale);
+							Draw_ScaledPicAlpha(iconX, y, sb_key1, scale, 1);
 							iconX += iconSpacing;
 						}
 
 						if (hasGoldKey && sb_key2)
 						{
-							Draw_ScaledPic(iconX, y, sb_key2, scale);
+							Draw_ScaledPicAlpha(iconX, y, sb_key2, scale, 1);
 							iconX += iconSpacing;
 						}
 
@@ -2217,25 +2275,25 @@ void SCR_ShowObsFrags(void)
 						// Draw runes
 						if (hasSigil1 && sb_sigil[0])
 						{
-							Draw_ScaledPic(iconX, y, sb_sigil[0], scale);
+							Draw_ScaledPicAlpha(iconX, y, sb_sigil[0], scale, 1);
 							iconX += iconSpacing;
 						}
 
 						if (hasSigil2 && sb_sigil[1])
 						{
-							Draw_ScaledPic(iconX, y, sb_sigil[1], scale);
+							Draw_ScaledPicAlpha(iconX, y, sb_sigil[1], scale, 1);
 							iconX += iconSpacing;
 						}
 
 						if (hasSigil3 && sb_sigil[2])
 						{
-							Draw_ScaledPic(iconX, y, sb_sigil[2], scale);
+							Draw_ScaledPicAlpha(iconX, y, sb_sigil[2], scale, 1);
 							iconX += iconSpacing;
 						}
 
 						if (hasSigil4 && sb_sigil[3])
 						{
-							Draw_ScaledPic(iconX, y, sb_sigil[3], scale);
+							Draw_ScaledPicAlpha(iconX, y, sb_sigil[3], scale, 1);
 						}
 					}
 				}
