@@ -527,6 +527,10 @@ void IN_Shutdown (void)
 #endif
 	IN_UpdateGrabs();
 	IN_ShutdownJoystick();
+#ifdef MACOS_X_ACCELERATION_HACK
+	if (originalMouseSpeed != -1)
+		IN_ReenableOSXMouseAccel();
+#endif
 }
 
 extern cvar_t cl_maxpitch; /* johnfitz -- variable pitch clamping */
