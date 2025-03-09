@@ -52,6 +52,7 @@ extern int	maptime; // woods connected map time #maptime
 extern char videosetg[50];	// woods #q_sysinfo (qrack)
 extern char videoc[40];		// woods #q_sysinfo (qrack)
 qboolean	endscoreprint = false; // woods pq_confilter+
+extern qboolean pausedprint; // woods
 
 extern Uint32 exec_dm_cfg (Uint32 interval, void* param); // woods #execdelay
 server_alias_t* server_aliases = NULL; // woods #serveralias
@@ -2510,6 +2511,7 @@ qboolean CL_ParseProQuakeString(const char* string) // #pqteam
 			{
 				if (!strcmp(string, "The match is over\n"))
 				{
+					pausedprint = false;
 					endscoreprint = true; // woods pq_confilter +
 					cl.matchinp = 0;
 					cl.match_pause_time = 0;
