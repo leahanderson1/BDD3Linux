@@ -5591,6 +5591,7 @@ static void M_Sound_AdjustSliders(int dir)
 				Cvar_SetValueQuick(&snd_mixspeed, 48000);
 			else
 				Cvar_SetValueQuick(&snd_mixspeed, 11025);
+			Cbuf_AddText("\nsnd_restart\n");
 		}
 		else {
 			// Going down: 11025<-22050<-44100<-48000<-11025

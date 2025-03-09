@@ -183,12 +183,28 @@ void S_Restart_f(void)
 {
 	sfx_t *s;
 	size_t i;
-	int oldspeed = shm->speed;
+	int oldspeed;
+
 	if (!snd_initialized)
 		return;
-	S_Shutdown();
-	S_Startup ();
-	S_CodecInit ();
+
+	oldspeed = shm ? shm->speed : 0;
+
+	if (sound_started)
+	{
+		sound_started = 0;
+		snd_blocked = 0;
+		SNDDMA_Shutdown();
+		shm = NULL;
+	}
+
+	S_Startup();
+
+	if (!sound_started || !shm)
+	{
+		Con_Printf("S_Restart_f: Failed to restart sound system\n");
+		return;
+	}
 
 	paintedtime = soundtime;
 	//we changed the sound time and probably the rates too...
@@ -202,7 +218,7 @@ void S_Restart_f(void)
 	s_rawend = 0;	//clear any music too...
 
 	//reload any sounds if their rates changed.
-	if (shm->speed != oldspeed)
+	if (oldspeed != 0 && shm->speed != oldspeed)
 	{
 		for (i = 0; i < num_sfx; i++)
 		{
@@ -263,7 +279,7 @@ void S_Init (void)
 	Cmd_AddCommand("stopsound", S_StopAllSoundsC);
 	Cmd_AddCommand("soundlist", S_SoundList);
 	Cmd_AddCommand("soundinfo", S_SoundInfo_f);
-//	Cmd_AddCommand("snd_restart", S_Restart_f);
+	Cmd_AddCommand("snd_restart", S_Restart_f);
 	Cmd_AddCommand("mute", Sound_Toggle_Mute_f); // woods #usermute
 
 	i = COM_CheckParm("-sndspeed");
