@@ -1762,7 +1762,7 @@ static qpic_t* Sbar_FacePic(void)
 	else
 		anim = 0;
 
-		face_pic = sb_faces[f][anim];
+	face_pic = sb_faces[f][anim];
 	}
 
 	Sbar_DrawPic(18, 140, face_pic);

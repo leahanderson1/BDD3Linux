@@ -1745,7 +1745,7 @@ void M_ScanSaves (void)
 		}
 
 		// Read map name
-		if (fscanf(f, "%79s\n", mapname) == 1)
+		if (fscanf(f, "%63s\n", mapname) == 1)
 		{
 			q_strlcpy (save_entries[i].mapname, mapname, sizeof(save_entries[i].mapname));
 		}
