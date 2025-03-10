@@ -1542,6 +1542,26 @@ static qboolean CompleteClassnames (const char* partial, void* unused) // woods 
 static qboolean CompleteFileListDemo (const char* partial, void* param) // woods #iwtabcomplete #demolistsort
 {
 	filelist_item_t* file, ** list = (filelist_item_t**)param;
+	char currentDateStr[80];
+
+	// Get current date/time for the -last option
+	time_t now = time(NULL);
+	struct tm* tm_now = localtime(&now);
+
+	if (tm_now)
+	{
+		q_snprintf(currentDateStr, sizeof(currentDateStr), "%04d-%02d-%02d %02d:%02d:%02d",
+			tm_now->tm_year + 1900, tm_now->tm_mon + 1, tm_now->tm_mday,
+			tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec);
+	}
+	else
+	{
+		Q_strncpy(currentDateStr, "current", sizeof(currentDateStr) - 1);
+		currentDateStr[sizeof(currentDateStr) - 1] = '\0';
+	}
+
+	Con_AddToTabList("-l", partial, "play last demo", currentDateStr);
+
 	for (file = *list; file; file = file->next)
 		Con_AddToTabList (file->name, partial, NULL, file->data);
 	return true;
