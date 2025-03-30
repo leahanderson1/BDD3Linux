@@ -1261,14 +1261,14 @@ static void UpdateWindowTitle(void)
 
 		if ((cl.gametype == GAME_DEATHMATCH) && (cls.state == ca_connected) && !cls.demoplayback) // woods added connected server
 {
-    if (ln[0] != '\0')
+    if (ln[0] != '\0' && Q_strcmp(ln, current.map) != 0)
         q_snprintf(title, sizeof(title), "%s  |  %s (%s)  -  " ENGINE_NAME_AND_VER, lastmphost, ln, current.map);
     else
         q_snprintf(title, sizeof(title), "%s  |  %s  -  " ENGINE_NAME_AND_VER, lastmphost, current.map);
 }
 else if (cls.demoplayback) // woods added demofile
 {
-    if (ln[0] != '\0')
+    if (ln[0] != '\0' && Q_strcmp(ln, current.map) != 0)
         q_snprintf(title, sizeof(title), "%s (%s)  |  %s  -  " ENGINE_NAME_AND_VER, ln, current.map, demoplaying);
     else
         q_snprintf(title, sizeof(title), "%s  |  %s  -  " ENGINE_NAME_AND_VER, current.map, demoplaying);
