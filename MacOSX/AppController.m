@@ -132,10 +132,21 @@ NSString *FQPrefScreenModeKey = @"ScreenMode";
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+    // Get current keyboard state - woods #option
+    NSUInteger flags = [NSEvent modifierFlags] & NSEventModifierFlagDeviceIndependentFlagsMask;
+    BOOL optionKeyPressed = (flags & NSEventModifierFlagOption) != 0;
+
 	if ([arguments argument:@"-nolauncher"] != nil) {
 		[arguments removeArgument:@"-nolauncher"];
 		[self launchQuake:self];
+    } else if (!optionKeyPressed) {
+        // If Option key is NOT pressed, directly execute the launch code
+        // First load preferences as awakeFromNib would have done
+        [self awakeFromNib];
+        // Then launch the game directly
+        [self launchQuake:self];
 	} else {
+        // Show launcher window if Option key is pressed
         [launcherWindow center];
 		[launcherWindow makeKeyAndOrderFront:self];
 	}
