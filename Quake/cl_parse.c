@@ -2508,6 +2508,7 @@ qboolean CL_ParseProQuakeString(const char* string) // #pqteam
 			{
 				cl.last_match_time += (cl.time - cl.match_pause_time);
 				cl.match_pause_time = 0;
+				pausedprint = false; // woods
 				cl.matchinp = 1;
 			}
 			else

@@ -270,6 +270,9 @@ void SCR_CenterPrint (const char *str) //update centerprint data
 
 	if ((strstr(str, qfPAUSED)) || (strstr(str, "PAUSED"))) // #showpaused
 	{
+		if (!cl.match_pause_time) // let client connecting during pause know by setting cl.match_pause_time
+			cl.match_pause_time = cl.time;
+		
 		pausedprint = true; // woods #qssmhints
 		return;
 	}

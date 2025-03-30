@@ -252,6 +252,7 @@ void CL_Disconnect (void)
 	if (cl.modtype == 1 || cl.modtype == 4)
 		Cbuf_AddText("setinfo observing off\n"); // woods
 	pausedprint = false;  // woods
+	cl.match_pause_time = 0; // woods
 }
 
 void CL_Disconnect_f (void)
@@ -428,6 +429,8 @@ void CL_SignonReply (void)
 
 		qeintermission = false; // woods #qeintermission
 		crxintermission = false; // woods #crxintermission
+		pausedprint = false; // woods
+		cl.match_pause_time = 0; // woods
 
 		cl.realviewentity = cl.viewentity; // woods -- eyecam reports wrong viewentity, lets record real one
 
