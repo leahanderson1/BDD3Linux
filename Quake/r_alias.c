@@ -572,6 +572,38 @@ void R_DrawAliasModelOutline(aliasglsl_t* glsl, aliashdr_t* paliashdr, lerpdata_
 		!(nameInList(r_nooutline_list.string, e->model->name))))
 		return;
 
+	if (!strcmp(e->model->name, "progs/eyes.mdl"))
+	{
+		qboolean allow_outline = false;
+
+		if (cls.demoplayback) 
+			allow_outline = true;
+		else if ((cl.gametype == GAME_DEATHMATCH) && (cls.state == ca_connected))
+		{
+			char buf[16], buf2[16];
+			const char* obs, * star_obs;
+
+			obs = Info_GetKey(cl.scores[cl.realviewentity - 1].userinfo, "observer", buf, sizeof(buf));
+			star_obs = Info_GetKey(cl.scores[cl.realviewentity - 1].userinfo, "*observer", buf2, sizeof(buf2));
+
+			if (cl.modtype == 1 || cl.modtype == 4) // mods with observer keys
+			{
+				if ((strcmp(obs, "eyecam") == 0 || strcmp(star_obs, "eyecam") == 0) ||
+					(strcmp(obs, "chase") == 0 || strcmp(star_obs, "chase") == 0) ||
+					(strcmp(obs, "fly") == 0 || strcmp(star_obs, "fly") == 0) ||
+					(strcmp(obs, "walk") == 0 || strcmp(star_obs, "walk") == 0))
+				{
+					allow_outline = true;
+				}
+			}
+			else if (strcmp(cl.observer, "n") != 0) // general observer flag for legacy mods/servers
+				allow_outline = true;
+		}
+
+		if (!allow_outline)
+			return;
+	}
+
 	float outlineWidth = R_CalculateAliasModelOutlineWidth(paliashdr, e, lerpdata);
 
 	if (outlineWidth <= 0.0f)
