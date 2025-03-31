@@ -1858,7 +1858,10 @@ static qboolean _Datagram_SearchForHosts (qboolean xmit)
 		MSG_WriteString(&net_message, "QUAKE");
 		MSG_WriteByte(&net_message, NET_PROTOCOL_VERSION);
 		*((int *)net_message.data) = BigLong(NETFLAG_CTL | (net_message.cursize & NETFLAG_LENGTH_MASK));
+
+		if (slistScope != SLIST_INTERNET) // woods
 		dfunc.Broadcast(dfunc.controlSock, net_message.data, net_message.cursize);
+
 		SZ_Clear(&net_message);
 
 		if (slistScope == SLIST_INTERNET)

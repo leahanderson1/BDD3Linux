@@ -9562,7 +9562,7 @@ void M_LanConfig_Key (int key)
 		else
 		{
 			if (lanConfig_cursor == 1)
-				M_Menu_Search_f(SLIST_LAN);
+				M_Menu_Search_f(SLIST_LOOP);
 			else if (lanConfig_cursor == 2)
 				M_Menu_Search_f(SLIST_INTERNET);
 			else if (lanConfig_cursor == 3) // woods #historymenu
@@ -11041,8 +11041,7 @@ void M_Menu_Search_f (enum slistScope_e scope)
 	IN_UpdateGrabs();
 	m_entersound = false;
 	slistSilent = true;
-	if (searchLastScope != scope) // woods #resethostlist
-		ResetHostlist();
+	ResetHostlist(); // woods #resethostlist
 	slistScope = searchLastScope = scope;
 	searchComplete = false;
 	NET_Slist_f();
@@ -11562,6 +11561,7 @@ void FetchAndSortServers (void)
 		}
 	}
 
+	if (searchLastScope == SLIST_INTERNET)
 	CurlServerList (&serversmenu.items, &actualServerCount);// fetch and add servers from the server.quakeone.com json API
 
 	RemoveDuplicateServers(&serversmenu.items, &actualServerCount);
