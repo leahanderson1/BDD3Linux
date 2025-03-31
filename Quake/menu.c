@@ -4527,8 +4527,8 @@ static void M_Mouse_AdjustSliders(int dir)
 	switch (mouse_cursor)
 	{
 	case MOUSE_SPEED:
-		f = sensitivity.value + dir * 0.5;
-		if (f > 11) f = 11;
+		f = sensitivity.value + dir * 0.1;
+		if (f > 20) f = 20;
 		else if (f < 1) f = 1;
 		Cvar_SetValue("sensitivity", f);
 		break;
@@ -4583,7 +4583,7 @@ void M_Mouse_Draw(void)
 		{
 		case MOUSE_SPEED:
 			text = "     Sensitivity";
-			r = (sensitivity.value - 1) / 10;
+			r = (sensitivity.value - 1) / 19;
 			M_DrawSlider(186, y, r, sensitivity.value, "%.1f");
 			break;
 
@@ -4810,7 +4810,7 @@ void M_Mouse_Mousemove(int cx, int cy)
 		switch (mouse_cursor)
 		{
 		case MOUSE_SPEED:
-			f = 1.f + M_MouseToSliderFraction(cx - 187) * 10.f;
+			f = 1.f + M_MouseToSliderFraction(cx - 187) * 19.f;
 			Cvar_SetValue("sensitivity", f);
 			break;
 		case MOUSE_INVERT:
