@@ -249,6 +249,28 @@ float GL_WaterAlphaForSurface (msurface_t *fa)
 		return map_wateralpha;// > 0 ? map_wateralpha : map_fallbackalpha;
 }
 
+gltexture_t* shelltexture; // woods #powershell
+
+static void R_InitOtherTextures () // woods #powershell
+{
+	int w, h;
+	enum srcformat fmt;
+	qboolean malloced;
+	byte* data;
+
+	if (COM_FileExists("textures/shellmap.tga", NULL))
+	{
+		data = Image_LoadImage("textures/shellmap", &w, &h, &fmt, &malloced);
+		shelltexture = TexMgr_LoadImage(NULL, "textures/shellmap", w, h, fmt, data, "textures/shellmap", 0,
+			TEXPREF_ALPHA |      // Allow alpha channel
+			TEXPREF_LINEAR |     // Linear filtering for smoother look
+			TEXPREF_MIPMAP |     // Generate mipmaps for better quality at different scales
+			TEXPREF_PERSIST |    // Keep the texture loaded
+			TEXPREF_NOPICMIP     // Always use full resolution
+		);
+	}
+}
+
 /*
 ====================
 ClearParticles_f -- woods #drawflame
@@ -354,6 +376,7 @@ void R_Init (void)
 	Cvar_RegisterVariable (&gl_farclip);
 	Cvar_RegisterVariable (&gl_fullbrights);
 	Cvar_RegisterVariable (&gl_overbright);
+	Cvar_RegisterVariable (&gl_powerupshells); // woods #powershell
 	Cvar_SetCallback (&gl_fullbrights, GL_Fullbrights_f);
 	Cvar_SetCallback (&gl_overbright, GL_Overbright_f);
 	Cvar_RegisterVariable (&gl_overbright_models);
@@ -399,6 +422,8 @@ void R_Init (void)
 
 	Sky_Init (); //johnfitz
 	Fog_Init (); //johnfitz
+
+	R_InitOtherTextures (); // woods #powershell
 }
 
 /*

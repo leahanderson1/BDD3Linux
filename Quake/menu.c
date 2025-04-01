@@ -4846,7 +4846,8 @@ Graphics Menu
 */
 
 extern cvar_t r_particles, gl_load24bit, r_replacemodels, r_lerpmodels, r_lerpmove, r_scale, r_outline,
-vid_gamma, vid_contrast, vid_fsaa, r_particledesc, gl_loadlitfiles, r_rocketlight, r_explosionlight;
+vid_gamma, vid_contrast, vid_fsaa, r_particledesc, gl_loadlitfiles, r_rocketlight, r_explosionlight,
+gl_powerupshells;
 
 static enum graphics_e
 {
@@ -4866,6 +4867,7 @@ static enum graphics_e
 	GRAPHICS_ALIASSHADOW,
 	GRAPHICS_BRUSHSHADOW,
 	GRAPHICS_MODELOUTLINES,
+	GRAPHICS_POWERUPSHELLS,
 	GRAPHICS_COUNT
 } graphics_cursor;
 
@@ -4919,6 +4921,8 @@ static const char* M_Graphics_GetItemText(int index)
 		return "Colored Lighting";
 	case GRAPHICS_MODELOUTLINES:
 		return "Model Outlines";
+	case GRAPHICS_POWERUPSHELLS:
+		return "Powerup Shells";
 	default:
 		q_snprintf(buffer, sizeof(buffer), "Unknown Item %d", index);
 		return buffer;
@@ -5090,6 +5094,15 @@ static void M_Graphics_AdjustSliders(int dir)
 		f = CLAMP(0, f, 5);
 		Cvar_SetValue("r_outline", f);
 		break;
+
+	case GRAPHICS_POWERUPSHELLS:
+	{
+		int value = gl_powerupshells.value + dir;
+		if (value < 0) value = 2;
+		if (value > 2) value = 0;
+		Cvar_SetValue("gl_powerupshells", value);
+	}
+	break;
 	}
 }
 
@@ -5225,6 +5238,17 @@ void M_Graphics_Draw(void)
 			text = "    Model Outlines";
 			r = r_outline.value / 5.0; // Normalize to 0-1 range for slider (max value is 5)
 			M_DrawSlider(186, y, r, r_outline.value, "%.0f");
+			break;
+
+		case GRAPHICS_POWERUPSHELLS:
+			text = "    Powerup Shells";
+			if (gl_powerupshells.value == 0)
+				value = "off";
+			else if (gl_powerupshells.value == 1)
+				value = "shell+effects";
+			else
+				value = "light only";
+			M_Print(178, y, value);
 			break;
 
 		default:
@@ -5476,6 +5500,7 @@ void M_Graphics_Mousemove(int cx, int cy)
 		case GRAPHICS_CUSTOMPARTICLES:
 		case GRAPHICS_COLOREDLIGHTING:
 		case GRAPHICS_BRUSHSHADOW:
+		case GRAPHICS_POWERUPSHELLS:
 		case GRAPHICS_COUNT:
 			break;
 

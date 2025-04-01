@@ -107,6 +107,14 @@ typedef struct
 	GLuint outlineWidthLoc; // woods #routline
 	GLuint isOutlinePassLoc; // woods #routline
 	GLuint outlineColorLoc; // woods #routline
+	GLuint shellTexLoc; // woods #powershell
+	GLuint useShellTexLoc; // woods #powershell
+	GLuint clTimeLoc; // woods #powershell
+	GLuint shellColorLoc; // woods #powershell
+	GLuint shellAlphaLoc; // woods #powershell
+	GLuint shellModeLoc; // woods #powershell
+	GLuint shellTimeLoc; // woods #powershell
+	GLuint shellWaveParamsLoc; // woods #powershell
 } aliasglsl_t;
 static aliasglsl_t r_alias_glsl[ALIAS_GLSL_MODES];
 
@@ -191,10 +199,18 @@ void GLAlias_CreateShaders (void)
 		"#version 110\n"
 		"%s"
 		"\n"
+		"uniform float ClTime;\n" // woods #powershell
+		"varying vec2 ShellCoord;\n" // woods #powershell
+		"varying vec2 ShellCoord2;\n" // woods #powershell
+		"\n"
+		"uniform int shellMode;\n"      // 0=normal, 1=outline, 2=shell
+		"uniform float shellTime;\n"    // Time for animation
+		"uniform vec4 shellWaveParams;\n" // x=amplitude, y=frequency, z=phase, w=unused
+		"\n"
 		"uniform vec3 ShadeVector;\n"
 		"uniform vec4 LightColor;\n"
 		"uniform float outlineWidth; // Amount to expand vertices\n" // woods #routline
-		"uniform bool isOutlinePass; // Indicates if this is the outline pass\n" // woods #routline
+		"uniform int isOutlinePass; // Indicates if this is the outline pass\n" // woods #routline
 		"attribute vec4 TexCoords; // only xy are used \n"
 		"attribute vec4 Pose1Vert;\n"
 		"attribute vec3 Pose1Normal;\n"
@@ -229,6 +245,20 @@ void GLAlias_CreateShaders (void)
 		"	vec4 lerpedVert;\n" // woods #routline
 		"	vec3 lerpedNormal;\n" // woods #routline
 		"\n"
+		"\n" // woods #powershell
+		"	float s = TexCoords.x + sin(0.4 * (ClTime + TexCoords.y));\n"
+		"	s *= -140.0 * (0.5 / 64.0);\n"
+		"	float t = TexCoords.y + sin(0.4 * (ClTime + TexCoords.x));\n"
+		"	t *= -140.0 * (0.5 / 64.0);\n"
+		"	ShellCoord = vec2(s, t);\n"
+		"\n"
+		"	float s2 = TexCoords.x + sin(0.4 * (-ClTime + TexCoords.y));\n"
+		"	s2 *= -140.0 * (0.5 / 64.0);\n"
+		"	float t2 = TexCoords.y + sin(0.4 * (-ClTime + TexCoords.x));\n"
+		"	t2 *= -140.0 * (0.5 / 64.0);\n"
+		"	ShellCoord = vec2(s, t);\n"
+		"	ShellCoord2 = vec2(s2, t2);\n"
+		"\n"
 		"#ifdef SKELETAL\n"
 		"	mat4 wmat;"
 		"	wmat[0]  = BoneTable[0+3*int(BoneIndex.x)] * BoneWeight.x;"
@@ -251,7 +281,7 @@ void GLAlias_CreateShaders (void)
 		"	vec3 transformedNormal = normalize((vec4(Pose1Normal.xyz, 0.0) * wmat).xyz);\n"
 		"\n"
 		"	float outlineScale = 1.0;\n"
-		"	if (isOutlinePass && outlineWidth > 0.0)\n"
+		"	if (isOutlinePass == 1 && outlineWidth > 0.0)\n"
 		"	{\n"
 		"		// Add the scaled normal for outline\n"
 		"		lerpedVert = basePos + vec4(transformedNormal * outlineWidth * outlineScale, 0.0);\n"
@@ -271,12 +301,25 @@ void GLAlias_CreateShaders (void)
 		"	lerpedNormal = normalize(lerpedNormal);\n"
 		"\n"
 		"	// Apply outline expansion if in the outline pass\n" // woods #routline
-		"	if (isOutlinePass && outlineWidth > 0.0)\n"
+		"	if (isOutlinePass == 1 && outlineWidth > 0.0)\n"
 		"	{\n"
 		"		lerpedVert.xyz += lerpedNormal * outlineWidth;\n"
 		"	}\n"
 		"\n"
 		"#endif\n"
+		"	if (shellMode == 2)\n" // woods #powershell
+		"		{\n"
+		"		// Start with the original vertex position\n"
+		"		vec3 finalPos = lerpedVert.xyz;\n"
+		"		// Get a properly normalized normal vector\n"
+		"		vec3 normalDir = normalize(lerpedNormal);\n"
+		"		// Add scaled offset along the normal direction using outlineWidth\n"
+		"		finalPos += normalDir * outlineWidth;\n"
+		"		// Add a wave effect along the normal direction\n"
+		"		float wave = sin(shellTime * shellWaveParams.y + dot(lerpedVert.xyz, vec3(0.1, 0.1, 0.1)));\n"
+		"		finalPos += normalDir * wave * shellWaveParams.x;\n"
+		"		lerpedVert = vec4(finalPos, 1.0);\n"
+		"	}\n"
 		"	gl_Position = gl_ModelViewProjectionMatrix * lerpedVert;\n"
 		"	FogFragCoord = gl_Position.w;\n"
 		"	gl_FrontColor = LightColor * vec4(vec3(dot1), 1.0);\n"
@@ -285,48 +328,86 @@ void GLAlias_CreateShaders (void)
 		"#endif\n"
 		"}\n";
 
-	const GLchar *fragSource = \
-		"#version 110\n"
-		"\n"
-		"uniform sampler2D Tex;\n"
-		"uniform sampler2D LowerTex;\n"	//team colour
-		"uniform sampler2D UpperTex;\n"	//personal colour
-		"uniform sampler2D FullbrightTex;\n"
-		"uniform bool UseFullbrightTex;\n"
-		"uniform bool UseOverbright;\n"
-		"uniform bool UseAlphaTest;\n"
-		"uniform vec4 ColourTint[3];\n"	//base+bot+top+fb
-		"uniform bool isOutlinePass;      // Indicates if this is the outline pass\n" // woods #routline
-		"uniform vec4 outlineColor;       // Color to use for the outline\n" // woods #routline
-		"\n"
-		"varying float FogFragCoord;\n"
-		"\n"
-		"void main()\n"
-		"{\n"
-		"    if (isOutlinePass)\n" // woods #routline
-		"    {\n"
-		"        // Render the outline with a solid color\n"
-		"        gl_FragColor = outlineColor;\n"
-		"        return;\n"
-		"    }\n"
-		"\n"
-		"	vec4 result = texture2D(Tex, gl_TexCoord[0].xy);\n"	//base
-		"	if (ColourTint[0].a != 0.0) result.rgb += texture2D(LowerTex, gl_TexCoord[0].xy).rgb * ColourTint[0].rgb;\n"	//team/lower/trousers
-		"	if (ColourTint[1].a != 0.0) result.rgb += texture2D(UpperTex, gl_TexCoord[0].xy).rgb * ColourTint[1].rgb;\n"	//personal/upper/torso
-		"	if (UseAlphaTest && (result.a < 0.666))\n"
-		"		discard;\n"
-		"	result *= gl_Color;\n"	//vertex lighting results (and colormod).
-		"	if (UseOverbright)\n"
-		"		result.rgb *= 2.0;\n"
-		"	if (UseFullbrightTex)\n"
-		"		result += texture2D(FullbrightTex, gl_TexCoord[0].xy) * ColourTint[2];\n" //fullbrights (with glowmod)
-		"	result = clamp(result, 0.0, 1.0);\n"
-		"	float fog = exp(-gl_Fog.density * gl_Fog.density * FogFragCoord * FogFragCoord);\n"
-		"	fog = clamp(fog, 0.0, 1.0) * gl_Fog.color.a;\n"
-		"	result.rgb = mix(gl_Fog.color.rgb, result.rgb, fog);\n"
-		"	result.a *= gl_Color.a;\n" // FIXME: This will make almost transparent things cut holes though heavy fog
-		"	gl_FragColor = result;\n"
-		"}\n";
+		const GLchar *fragSource = \
+			"#version 110\n"
+			"\n"
+			"uniform sampler2D Tex;\n"
+			"uniform sampler2D LowerTex;\n"	//team colour
+			"uniform sampler2D UpperTex;\n"	//personal colour
+			"uniform sampler2D FullbrightTex;\n"
+			"\n"
+			"uniform sampler2D ShellTex;\n" // woods #powershell
+			"uniform bool UseShellTex;\n" // woods #powershell
+			"uniform vec3 ShellColor;\n" // woods #powershell
+			"uniform float ShellAlpha;\n" // woods #powershell
+			"uniform float shellTime;\n" // woods #powershell
+			"\n"
+			"uniform bool UseFullbrightTex;\n"
+			"uniform bool UseOverbright;\n"
+			"uniform bool UseAlphaTest;\n"
+			"uniform vec4 ColourTint[3];\n"	//base+bot+top+fb
+			"uniform int isOutlinePass;      // Indicates if this is the outline pass\n" // woods #routline
+			"uniform vec4 outlineColor;       // Color to use for the outline\n" // woods #routline
+			"\n"
+			"varying vec2 ShellCoord;\n" // woods #powershell
+			"varying vec2 ShellCoord2;\n" // woods #powershell
+			"\n"
+			"varying float FogFragCoord;\n"
+			"\n"
+			"void main()\n"
+			"{\n"
+			"if (isOutlinePass == 1)\n"
+			"    {\n"
+			"        // Render the outline with a solid color\n"
+			"        gl_FragColor = outlineColor;\n"
+			"        return;\n"
+			"    }\n"
+			"    else if (isOutlinePass == 2)\n" // woods #powershell
+			"	{\n"
+			"        // Create a complex shell effect with animated patterns\n"
+			"        float pattern = sin(gl_TexCoord[0].x * 10.0 + shellTime) * \n"
+			"                       sin(gl_TexCoord[0].y * 10.0 + shellTime) * 0.25 + 0.75;\n"
+			"        gl_FragColor = vec4(outlineColor.rgb * pattern, outlineColor.a);\n"
+			"        return;\n"
+			"    }\n"
+			"\n"
+			"	vec4 result = texture2D(Tex, gl_TexCoord[0].xy);\n"	//base
+			"\n"
+			"if (UseShellTex)\n" // woods #powershell
+			"{\n"
+			"    vec4 shell1 = texture2D(ShellTex, ShellCoord);\n"
+			"    float brightness1 = shell1.r;\n"
+			"    vec3 coloredShell1 = mix(vec3(1.0), ShellColor, brightness1);\n"
+			"    shell1.rgb *= coloredShell1;\n"
+			"    shell1.a = brightness1 * ShellAlpha;\n"
+			"\n"
+			"    vec4 shell2 = texture2D(ShellTex, ShellCoord2);\n"
+			"    float brightness2 = shell2.r;\n"
+			"    vec3 coloredShell2 = mix(vec3(1.0), ShellColor, brightness2);\n"
+			"    shell2.rgb *= coloredShell2;\n"
+			"    shell2.a = brightness2 * ShellAlpha;\n"
+			"\n"
+			"    vec4 combinedShell = mix(shell1, shell2, 0.5);\n"
+			"    result = mix(result, combinedShell * result + result * combinedShell, combinedShell.a);\n"
+			"}\n"
+
+			"\n"
+			"	if (ColourTint[0].a != 0.0) result.rgb += texture2D(LowerTex, gl_TexCoord[0].xy).rgb * ColourTint[0].rgb;\n"	//team/lower/trousers
+			"	if (ColourTint[1].a != 0.0) result.rgb += texture2D(UpperTex, gl_TexCoord[0].xy).rgb * ColourTint[1].rgb;\n"	//personal/upper/torso
+			"	if (UseAlphaTest && (result.a < 0.666))\n"
+			"		discard;\n"
+			"	result *= gl_Color;\n"	//vertex lighting results (and colormod).
+			"	if (UseOverbright)\n"
+			"		result.rgb *= 2.0;\n"
+			"	if (UseFullbrightTex)\n"
+			"		result += texture2D(FullbrightTex, gl_TexCoord[0].xy) * ColourTint[2];\n" //fullbrights (with glowmod)
+			"	result = clamp(result, 0.0, 1.0);\n"
+			"	float fog = exp(-gl_Fog.density * gl_Fog.density * FogFragCoord * FogFragCoord);\n"
+			"	fog = clamp(fog, 0.0, 1.0) * gl_Fog.color.a;\n"
+			"	result.rgb = mix(gl_Fog.color.rgb, result.rgb, fog);\n"
+			"	result.a *= gl_Color.a;\n" // FIXME: This will make almost transparent things cut holes though heavy fog
+			"	gl_FragColor = result;\n"
+			"}\n";
 
 	if (!gl_glsl_alias_able)
 		return;
@@ -377,6 +458,16 @@ void GLAlias_CreateShaders (void)
 			glsl->isOutlinePassLoc = GL_GetUniformLocation (&glsl->program, "isOutlinePass"); // woods #routline
 			glsl->outlineColorLoc = GL_GetUniformLocation (&glsl->program, "outlineColor"); // woods #routline
 
+			// woods #powershell
+			glsl->clTimeLoc = GL_GetUniformLocation (&glsl->program, "ClTime");
+			glsl->shellTexLoc = GL_GetUniformLocation (&glsl->program, "ShellTex");
+			glsl->useShellTexLoc = GL_GetUniformLocation (&glsl->program, "UseShellTex");
+			glsl->shellColorLoc = GL_GetUniformLocation (&glsl->program, "ShellColor");
+			glsl->shellAlphaLoc = GL_GetUniformLocation (&glsl->program, "ShellAlpha");
+			glsl->shellModeLoc = GL_GetUniformLocation(&glsl->program, "shellMode");
+			glsl->shellTimeLoc = GL_GetUniformLocation(&glsl->program, "shellTime");
+			glsl->shellWaveParamsLoc = GL_GetUniformLocation(&glsl->program, "shellWaveParams");
+
 			//we can do this here, its not going to change.
 			GL_UseProgramFunc (glsl->program);
 			GL_Uniform1iFunc (glsl->texLoc, 0);
@@ -385,6 +476,10 @@ void GLAlias_CreateShaders (void)
 			GL_Uniform1iFunc (glsl->upperTexLoc, 3);
 			GL_Uniform1iFunc (glsl->outlineWidthLoc, 0.0f); // woods #routline
 			GL_Uniform1iFunc (glsl->isOutlinePassLoc, 0); // woods #routline
+			GL_Uniform1iFunc (glsl->shellTexLoc, 3);  // woods #powershell
+			GL_Uniform1iFunc(glsl->shellModeLoc, 0);  // woods #powershell
+			GL_Uniform1fFunc(glsl->shellTimeLoc, 0.0f);  // woods #powershell
+			GL_Uniform4fFunc(glsl->shellWaveParamsLoc, 0.1f, 4.0f, 0.0f, 0.0f);  // woods #powershell
 			GL_UseProgramFunc (0);
 		}
 	}
@@ -677,6 +772,112 @@ void R_DrawAliasModelOutline(aliasglsl_t* glsl, aliashdr_t* paliashdr, lerpdata_
 
 /*
 =============
+R_DrawViewmodelShell -- woods #powershell
+=============
+*/
+void R_DrawViewmodelShell(aliasglsl_t* glsl, aliashdr_t* paliashdr, lerpdata_t* lerpdata, entity_t* e)
+{
+	if ((!r_coloredpowerupglow.value || gl_powerupshells.value > 1 || e != &cl.viewent) || !(cl.items & (IT_QUAD | IT_INVULNERABILITY)) || chase_active.value)
+		return;
+
+	float modelRadius;
+
+	if (paliashdr->boundingradius > 0) 
+	{
+		modelRadius = paliashdr->boundingradius;
+	}
+	else 
+	{ // Calculate approximate radius from scale
+		modelRadius = (paliashdr->scale[0] + paliashdr->scale[1] + paliashdr->scale[2]) / 3.0f;
+	}
+
+	float baseScale = 14.0f;
+	float inverseScale = baseScale * pow(15.0f / q_max(modelRadius, 1.0f), 1.6f);
+	float shellScale = CLAMP(0.08f, inverseScale, 8.0f);
+
+	glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+	glEnable(GL_STENCIL_TEST);
+	glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+	glStencilMask(0x00);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
+	// Disable depth writing but enable depth test
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_LEQUAL);
+
+	float waveAmp = 0.0f;      // Set to 0 to disable wave animation
+	float waveFreq = 0.0f;     // Not used when waveAmp is 0
+	float shellAlpha = 0.1f;   // Shell transparency
+
+	float shellColor[4] = { 0.0f, 0.0f, 0.0f, shellAlpha };
+
+	if ((cl.items & IT_QUAD) && (cl.items & IT_INVULNERABILITY))
+	{
+		shellColor[0] = 1.0f;  // Red
+		shellColor[2] = 1.0f;  // Blue
+	}
+	else if (cl.items & IT_QUAD)
+		shellColor[2] = 1.0f;  // Blue
+	else if (cl.items & IT_INVULNERABILITY)
+		shellColor[0] = 1.0f;  // Red
+
+	GL_Uniform1iFunc(glsl->shellModeLoc, 2);
+	GL_Uniform1iFunc(glsl->isOutlinePassLoc, 2);
+	GL_Uniform1fFunc(glsl->outlineWidthLoc, shellScale);
+	GL_Uniform4fFunc(glsl->outlineColorLoc, shellColor[0], shellColor[1], shellColor[2], shellAlpha);
+	GL_Uniform1fFunc(glsl->shellTimeLoc, 0); // Set to 0 to disable time-based effects
+	GL_Uniform4fFunc(glsl->shellWaveParamsLoc, waveAmp, waveFreq, 0.0f, 0.0f);
+
+	// Draw the shell
+	glDrawElements(GL_TRIANGLES, paliashdr->numindexes, GL_UNSIGNED_SHORT,
+		e->model->meshindexesvboptr + paliashdr->eboofs);
+
+	glPopAttrib();
+
+	// Reset shader uniforms
+	GL_Uniform1iFunc(glsl->isOutlinePassLoc, 0);
+	GL_Uniform1iFunc(glsl->shellModeLoc, 0);
+}
+
+static void ApplyShellEffect(aliasglsl_t* glsl, float red, float green, float blue, float time, float alpha) // -- woods #powershell
+{
+	GL_Uniform1iFunc(glsl->useShellTexLoc, 1);
+	GL_SelectTexture(GL_TEXTURE3);
+	GL_Bind(shelltexture);
+	GL_Uniform1fFunc(glsl->clTimeLoc, time);
+	GL_Uniform3fFunc(glsl->shellColorLoc, red, green, blue);
+	GL_Uniform1fFunc(glsl->shellAlphaLoc, alpha);
+}
+
+static void R_ApplyPowerupShellEffect(aliasglsl_t* glsl, entity_t* e) // -- woods #powershell
+{
+	GL_Uniform1iFunc(glsl->useShellTexLoc, 0);
+
+	if (!(cl.time <= cl.faceanimtime && cl_damagehue.value))
+	{
+		if (cl.gametype == GAME_DEATHMATCH && e == &cl.viewent && !chase_active.value)
+		{
+			if (r_coloredpowerupglow.value && gl_powerupshells.value <= 1)
+			{
+				float shellAlpha = 1.0f * CLAMP(0, gl_powerupshells.value, 1);
+
+				if ((cl.items & IT_QUAD) && (cl.items & IT_INVULNERABILITY))
+					ApplyShellEffect(glsl, 1.0f, 0.0f, 1.0f, cl.time, shellAlpha);
+				else if (cl.items & IT_QUAD)
+					ApplyShellEffect(glsl, 0.0f, 0.0f, 1.0f, cl.time, shellAlpha);
+				else if (cl.items & IT_INVULNERABILITY)
+					ApplyShellEffect(glsl, 1.0f, 0.0f, 0.0f, cl.time, shellAlpha);
+			}
+		}
+	}
+}
+
+/*
+=============
 R_EndAliasOutlineRendering -- woods #routline
 =============
 */
@@ -917,10 +1118,16 @@ static void GL_DrawAliasFrame_GLSL (aliasglsl_t *glsl, aliashdr_t *paliashdr, le
 
 	R_BeginAliasOutlineRendering(glsl); // woods #routline
 
+	R_ApplyPowerupShellEffect(glsl, e); // woods #powershell
+
 // draw
 	glDrawElements (GL_TRIANGLES, paliashdr->numindexes, GL_UNSIGNED_SHORT, currententity->model->meshindexesvboptr+paliashdr->eboofs);
 
-	R_DrawAliasModelOutline(glsl, paliashdr, &lerpdata, e); // woods #routline
+	if (e != &cl.viewent)
+		R_DrawAliasModelOutline(glsl, paliashdr, &lerpdata, e); // woods #routline
+	else if (cl.items & (IT_QUAD | IT_INVULNERABILITY))
+		R_DrawViewmodelShell(glsl, paliashdr, &lerpdata, e); // woods #powershell
+
 	R_EndAliasOutlineRendering(); // woods #routline
 
 // clean up
@@ -1571,40 +1778,62 @@ void R_SetupAliasLighting (entity_t	*e)
 
 	// end woods for damage taken
 
-	// begin woods add hue to gun model with powerups
+	// begin woods add hue to gun model with powerups, simple #powershell value of 1 to 2
 
 	if (!(cl.time <= cl.faceanimtime && cl_damagehue.value))
-	{ 
-		if ((cl.gametype == GAME_DEATHMATCH) && r_coloredpowerupglow.value)
+	{
+		if ((cl.gametype == GAME_DEATHMATCH) && r_coloredpowerupglow.value && gl_powerupshells.value)
 		{
-			if (cl.items & IT_QUAD)
-				if (e == &cl.viewent)
+			float alpha;
+
+			// for values over 1 for basic coloring
+			float t = (gl_powerupshells.value - 1.0f) / (2.0f - 1.0f);
+			t = CLAMP(t, 0.0f, 1.0f);
+			alpha = t * t * (3.0f - 2.0f * t);
+
+			if (gl_powerupshells.value <= 1.0f)
+			{
+				if (shelltexture)
 				{
-					{
-						lightcolor[0] = 50;
-						lightcolor[1] = 50;
-						lightcolor[2] = 121;
-					}
+					// Original behavior for shell effect
+					alpha += 0.95f;
 				}
+				else
+				{
+					// For non-shell texture, treat values 0-1 like we treat 1-2
+					t = gl_powerupshells.value / 1.0f;
+					t = CLAMP(t, 0.0f, 1.0f);
+					alpha = t * t * (3.0f - 2.0f * t);
+				}
+			}
+
+			if ((cl.items & IT_QUAD) && (e == &cl.viewent))
+			{
+				vec3_t targetColor = { 50.0f, 50.0f, 121.0f };
+
+				lightcolor[0] = lightcolor[0] * (1.0f - alpha) + targetColor[0] * alpha;
+				lightcolor[1] = lightcolor[1] * (1.0f - alpha) + targetColor[1] * alpha;
+				lightcolor[2] = lightcolor[2] * (1.0f - alpha) + targetColor[2] * alpha;
+			}
 
 			if (cl.items & IT_INVULNERABILITY)
 				if (e == &cl.viewent)
 				{
-					{
-						lightcolor[0] = 131;
-						lightcolor[1] = 73;
-						lightcolor[2] = 73;
-					}
+					vec3_t targetColor = { 131.0f, 73.0f, 73.0f };
+
+					lightcolor[0] = lightcolor[0] * (1.0f - alpha) + targetColor[0] * alpha;
+					lightcolor[1] = lightcolor[1] * (1.0f - alpha) + targetColor[1] * alpha;
+					lightcolor[2] = lightcolor[2] * (1.0f - alpha) + targetColor[2] * alpha;
 				}
 
 			if ((cl.items & (IT_QUAD | IT_INVULNERABILITY)) == (IT_QUAD | IT_INVULNERABILITY))
 				if (e == &cl.viewent)
 				{
-					{
-						lightcolor[0] = 211;
-						lightcolor[1] = 113;
-						lightcolor[2] = 194;
-					}
+					vec3_t targetColor = { 211.0f, 113.0f, 194.0f };
+
+					lightcolor[0] = lightcolor[0] * (1.0f - alpha) + targetColor[0] * alpha;
+					lightcolor[1] = lightcolor[1] * (1.0f - alpha) + targetColor[1] * alpha;
+					lightcolor[2] = lightcolor[2] * (1.0f - alpha) + targetColor[2] * alpha;
 				}
 		}
 	}

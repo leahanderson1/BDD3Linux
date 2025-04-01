@@ -189,6 +189,7 @@ extern	cvar_t	gl_enemycolor; // woods #enemycolors
 extern	cvar_t	gl_teamcolor; // woods #enemycolors
 extern	cvar_t	gl_laserpoint; // woods #laser
 extern	cvar_t	gl_laserpoint_alpha; // woods #laser
+extern	cvar_t	gl_powerupshells; // woods #powershell
 
 extern	cvar_t	gl_playermip;
 
@@ -223,6 +224,9 @@ extern PFNGLMAPBUFFERARBPROC	GL_MapBufferFunc;
 extern PFNGLUNMAPBUFFERARBPROC	GL_UnmapBufferFunc;
 extern	qboolean	gl_vbo_able;
 //ericw
+
+extern gltexture_t* shelltexture; // woods #powershell
+
 extern PFNGLMAPBUFFERRANGEPROC	GL_MapBufferRangeFunc;
 extern PFNGLBUFFERSTORAGEPROC	GL_BufferStorageFunc;
 
