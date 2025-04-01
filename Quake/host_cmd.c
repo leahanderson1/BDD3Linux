@@ -94,11 +94,14 @@ void FileList_Add (const char *name, const char* data, filelist_item_t **list) /
 	// ignore duplicate
 	for (item = *list; item; item = item->next)
 	{
-		if (!Q_strcmp (name, item->name))
+		if (!q_strcasecmp (name, item->name))
 			return;
 	}
 
 	item = (filelist_item_t *) Z_Malloc(sizeof(filelist_item_t));
+	if (!item)
+		Sys_Error("FileList_Add: out of memory on %lu bytes (%s)",
+			(unsigned long)sizeof(filelist_item_t), name);
 	q_strlcpy (item->name, name, sizeof(item->name));
 	if (data)
 		q_strlcpy(item->data, data, sizeof(item->data)); // woods #demolistsort add arg
