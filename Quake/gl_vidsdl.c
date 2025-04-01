@@ -29,16 +29,23 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #if defined(SDL_FRAMEWORK) || defined(NO_SDL_CONFIG)
 #if defined(USE_SDL2)
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_syswm.h>
 #else
 #include <SDL/SDL.h>
+#include "SDL_syswm.h"
 #endif
 #else
 #include "SDL.h"
+#include "SDL_syswm.h"
 #endif
 
 //ericw -- for putting the driver into multithreaded mode
 #ifdef __APPLE__
 #include <OpenGL/OpenGL.h>
+#endif
+
+#ifdef _WIN32
+#include <windows.h>
 #endif
 
 #define MAX_MODE_LIST	600 //johnfitz -- was 30
@@ -97,6 +104,10 @@ static void VID_MenuMouse(int cx, int cy); // woods #mousemenu
 static void ClearAllStates (void);
 static void GL_Init (void);
 static void GL_SetupState (void); //johnfitz
+
+#if defined(USE_SDL2) && defined(_WIN32)
+static void EnableDarkModeForSDLWindow(SDL_Window *window); // woods #darkmode
+#endif
 
 viddef_t	vid;				// global video state
 modestate_t	modestate = MS_UNINIT;
@@ -715,6 +726,10 @@ static qboolean VID_SetMode (int width, int height, int refreshrate, int bpp, qb
 
 	SDL_ShowWindow (draw_context);
 	SDL_RaiseWindow (draw_context);
+
+#if defined(USE_SDL2) && defined(_WIN32)
+EnableDarkModeForSDLWindow(draw_context); // woods #darkmode - apply dark mode to window titlebar on Windows 10/11
+#endif
 
 	/* Create GL context if needed */
 	if (!gl_context) {
@@ -3046,3 +3061,59 @@ void VID_Minimize (void) // woods for mac command-tab
 {
 	SDL_MinimizeWindow(draw_context);
 }
+
+#if defined(USE_SDL2) && defined(_WIN32)
+/*
+====================
+EnableDarkModeForSDLWindow -- woods #darkmode
+====================
+*/
+static void EnableDarkModeForSDLWindow(SDL_Window* window)
+{
+	if (!window)
+		return;
+
+	HWND hwnd = NULL;
+
+	// Get the native window handle
+	struct SDL_SysWMinfo wmInfo;
+	SDL_VERSION(&wmInfo.version);
+	if (!SDL_GetWindowWMInfo(window, &wmInfo)) {
+		// Failed to get window info
+		return;
+	}
+
+	hwnd = wmInfo.info.win.window;
+	if (!hwnd) {
+		// Invalid window handle
+		return;
+	}
+
+	// Set immersive dark mode - this is only supported on Windows 10 1903+
+	// We'll dynamically load the function to ensure compatibility with older Windows
+
+	BOOL useDarkMode = TRUE;
+	const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+	const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19;
+
+	HMODULE dwmapi = LoadLibrary("dwmapi.dll");
+	if (dwmapi) {
+		typedef HRESULT(WINAPI* DwmSetWindowAttributeFunc)(HWND, DWORD, LPCVOID, DWORD);
+		DwmSetWindowAttributeFunc pDwmSetWindowAttribute =
+			(DwmSetWindowAttributeFunc)GetProcAddress(dwmapi, "DwmSetWindowAttribute");
+
+		if (pDwmSetWindowAttribute) {
+			// Try the newer attribute value first (20 - Windows 10 1903 and later)
+			HRESULT hr = pDwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &useDarkMode, sizeof(useDarkMode));
+
+			// If that failed, try the older value (19 - some interim Windows 10 builds)
+			if (FAILED(hr)) {
+				// Ignore the result of this call - if it fails, we just don't get dark mode
+				pDwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, &useDarkMode, sizeof(useDarkMode));
+			}
+		}
+
+		FreeLibrary(dwmapi);
+	}
+}
+#endif
