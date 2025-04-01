@@ -1860,7 +1860,7 @@ static qboolean _Datagram_SearchForHosts (qboolean xmit)
 		*((int *)net_message.data) = BigLong(NETFLAG_CTL | (net_message.cursize & NETFLAG_LENGTH_MASK));
 
 		if (slistScope != SLIST_INTERNET) // woods
-		dfunc.Broadcast(dfunc.controlSock, net_message.data, net_message.cursize);
+			dfunc.Broadcast(dfunc.controlSock, net_message.data, net_message.cursize);
 
 		SZ_Clear(&net_message);
 

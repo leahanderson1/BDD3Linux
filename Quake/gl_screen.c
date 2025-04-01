@@ -1083,7 +1083,7 @@ void SCR_DrawFPS (void)
 		if (scr_clock.value)
 			y -= 12; //make room for clock // woods added padding
 
-			Draw_String (x - (strlen(st) << 3), y, st);
+		Draw_String (x - (strlen(st) << 3), y, st);
 
 		scr_tileclear_updates = 0;
 	}
