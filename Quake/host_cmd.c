@@ -3217,16 +3217,48 @@ static void Host_Name_f (void)
 {
 	char	newName[32];
 	int a, b, c;	// JPG 1.05 - ip address logging  // woods for #iplog
+	qboolean truncated = false;
 
 	if (Cmd_Argc () == 1)
 	{
-		Con_Printf ("\"name\" is \"%s\"\n", cl_name.string);
+		Con_Printf ("\n\"name\" is \"%s\"\n\n", cl_name.string);
+
+		char final_string[MAXCMDLINE];
+		q_snprintf(final_string, sizeof(final_string), "name \"%s\"", cl_name.string);
+
+		if (edit_line < 0 || edit_line >= CMDLINES) // Ensure edit_line is within bounds
+		{
+			Con_Printf("\nedit line index out of bounds.\n\n");
 		return;
 	}
+
+		key_lines[edit_line][0] = ']'; // Prompt character
+		key_lines[edit_line][1] = '\0'; // Null terminate
+
+		q_snprintf(key_lines[edit_line] + 1, MAXCMDLINE - 1, "%s", final_string);
+
+		key_linepos = (int)strlen(key_lines[edit_line]); // Set key_linepos to the end of the line
+
+		// Make sure the console is open for editing
+		if (key_dest != key_console)
+			key_dest = key_console;
+
+		return;
+	}
+
 	if (Cmd_Argc () == 2)
+	{
+		if (strlen(Cmd_Argv(1)) > 15)
+			truncated = true;
 		q_strlcpy(newName, Cmd_Argv(1), sizeof(newName));
+	}
 	else
+	{
+		if (strlen(Cmd_Args()) > 15)
+			truncated = true;
 		q_strlcpy(newName, Cmd_Args(), sizeof(newName));
+	}
+
 	newName[15] = 0;	// client_t structure actually says name[32].
 
 	// JPG 3.02 - remove bad characters // woods for #iplog
@@ -3240,9 +3272,21 @@ static void Host_Name_f (void)
 
 	if (cmd_source != src_client)
 	{
-		if (Q_strcmp(cl_name.string, newName) == 0)
+		if (truncated && Q_strcmp(cl_name.string, newName) == 0)
+		{
+			Con_Printf("\n\"name\" remains \"%s\" (truncated to 15 characters)\n\n", newName);
 			return;
+		}
+		else if (Q_strcmp(cl_name.string, newName) == 0)
+		{
+			return;
+		}
+
 		Cvar_Set ("name", newName);
+		Con_Printf("\n\"name\" changed to \"%s\"", newName);
+		if (truncated)
+			Con_Printf(" (truncated to 15 characters)");
+		Con_Printf("\n\n");
 	}
 	else
 		SV_UpdateInfo((host_client-svs.clients)+1, "name", newName);
