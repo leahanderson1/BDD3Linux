@@ -184,6 +184,7 @@ void R_DrawSpriteModel (entity_t *e)
 
 	glEnd ();
 	glDisable (GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.666); // woods #extsprites
 
 	if (frame->gltexture->flags & TEXPREF_ALPHA) // woods #extsprites
 	{
