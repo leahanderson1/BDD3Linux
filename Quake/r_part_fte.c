@@ -6491,7 +6491,7 @@ static void R_AddTSparkParticle(scenetris_t *t, particle_t *p, plooks_t *type)
 		else if (type->stretch)
 			length *= type->stretch;	//velocity multiplier
 		else
-			Sys_Error("type->stretch should be 0.05\n");
+		{
 //			length *= 0.05;				//fallback
 
 		if (length < halfscale * type->minstretch)
