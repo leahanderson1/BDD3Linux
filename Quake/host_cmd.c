@@ -3500,17 +3500,25 @@ static void Host_Like_f (void) // woods #like
 
 	char text[MAXCMDLINE];
 
-	if (strstr(cl.lastchat, ": likes")) // no intinite likes
+	if (strstr(cl.lastchat, ": ^mlikes^m")) // no intinite likes
 		return;
 
 	if (cl.lastchat[0] == '\0')
 	{
-		Con_Printf("\nnothing to like\n\n");
+		Con_Printf("\nnothing to like\n");
 		lastLikeTime = currentTime;
 		return;
 	}
 
+	// Check if we're liking a team chat message (contains parentheses)
+	qboolean is_team_message = (strchr(cl.lastchat, '(') != NULL && strchr(cl.lastchat, ')') != NULL);
+
+	if (is_team_message) {
+		q_snprintf(text, sizeof(text), "say_team likes %s", cl.lastchat + 1);
+	}
+	else {
 	q_snprintf(text, sizeof(text), "say likes %s", cl.lastchat + 1);
+	}
 	Cbuf_AddText(text);
 }
 

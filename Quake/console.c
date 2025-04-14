@@ -101,6 +101,8 @@ extern qboolean isChatTimerRunning; // woods #chatinfo
 #define BIRTHDAY_DURATION 30000 // 30 seconds in ms -- woods #qbday
 extern qboolean pak0; // pak0 present  -- woods #qbday
 static Uint32 birthday_start_time = 0; // woods #qbday
+static int console_msg_since_lastchat = 0; // woods #like
+extern qboolean WordFilter_Check(const char* text, char* dest_buffer, size_t buffer_size); // woods #contentfilter
 
 /*
 ================
@@ -493,6 +495,170 @@ void Ghost_ID_Backup_f (void)
 	fclose(f);
 }
 
+static qboolean Con_ProcessPlayerMessage(const char* txt) // woods #like
+{
+	if (!(cls.signon == SIGNONS && cl.maxclients > 1))
+		return false;
+
+	// Find the first colon which might separate a player name from message
+	const char* colon_pos = strstr(txt, ": ");
+
+	if (!colon_pos)
+		return false;
+
+	// Extract potential player name
+	int name_length = colon_pos - txt;
+
+	// Check if this could reasonably be a player name
+	if (name_length <= 0 || name_length >= 32)
+		return false;
+
+	char sender_name[32];
+	memcpy(sender_name, txt, name_length);
+	sender_name[name_length] = '\0';
+
+	// Clean the sender name of control characters
+	char clean_sender_name[32];
+	int clean_idx = 0;
+	for (int i = 0; i < name_length && clean_idx < 31; i++) {
+		if ((unsigned char)sender_name[i] >= 32) { // Skip control characters
+			clean_sender_name[clean_idx++] = sender_name[i];
+		}
+	}
+	clean_sender_name[clean_idx] = '\0';
+
+	// Check if this name exists in the scoreboard
+	qboolean valid_player = false;
+	for (int i = 0; i < cl.maxclients; i++) {
+		scoreboard_t* s = &cl.scores[i];
+		if (!s->name[0]) // Skip empty slots
+			continue;
+
+		// Create a clean version of the scoreboard name, only first 15 chars (actual name)
+		char clean_name[16]; // Just for the actual player name
+		const char* src = s->name;
+		char* dst = clean_name;
+		int len = 0;
+
+		// Copy while removing color codes, limit to first part of name (max 15 chars)
+		while (*src && len < 15) {
+			if (*src == '^' && *(src + 1)) {
+				src += 2; // Skip color code
+				continue;
+			}
+			*dst++ = *src++;
+			len++;
+		}
+		*dst = '\0';
+
+		// Trim trailing spaces
+		dst = clean_name + strlen(clean_name) - 1;
+		while (dst >= clean_name && *dst == ' ')
+			*dst-- = '\0';
+
+		if (strlen(clean_name) == 0) // Skip if no valid name after cleaning
+			continue;
+
+		// Compare with our sender name using substring matching (case insensitive)
+		qboolean name_match = false;
+
+		// First check for team chat format with parentheses
+		char team_format[34]; // Clean name with parentheses
+		snprintf(team_format, sizeof(team_format), "(%s)", clean_name);
+
+		// Use case-insensitive substring search with the clean sender name
+		if (q_strcasestr(clean_sender_name, clean_name) != NULL ||
+			q_strcasestr(clean_sender_name, team_format) != NULL) {
+			name_match = true;
+		}
+
+		// Additional check for special cases
+		if (!name_match && clean_idx > 0 && clean_sender_name[0] == '(' &&
+			strstr(clean_sender_name + 1, clean_name) != NULL) {
+			name_match = true;
+		}
+
+		// If content filtering is enabled, check if the filtered name would match
+		if (!name_match && cl_contentfilter.value == 2) 
+		{
+			char filtered_name[32];
+			char filtered_sender[32];
+
+			// Filter both the sender name and the scoreboard name
+			WordFilter_Check(clean_name, filtered_name, sizeof(filtered_name));
+			WordFilter_Check(clean_sender_name, filtered_sender, sizeof(filtered_sender));
+
+			// Check for matches with filtered names
+			if (q_strcasestr(filtered_sender, filtered_name) != NULL) {
+				name_match = true;
+			}
+
+			// Check for team format with filtered name
+			snprintf(team_format, sizeof(team_format), "(%s)", filtered_name);
+			if (q_strcasestr(filtered_sender, team_format) != NULL) {
+				name_match = true;
+			}
+		}
+
+		if (name_match) {
+			valid_player = true;
+			break;
+		}
+	}
+
+	// If it's a valid player message, look for "likes" and format it, for qss(m) white chars
+	if (valid_player)
+	{
+		const char* search = ": likes ";
+		const char* likes_pos = strstr(txt, search);
+
+		if (likes_pos)
+		{
+			size_t new_len = strlen(txt) + strlen("^m^m"); // Additional length for ^m markers
+			char* modified_txt = (char*)malloc(new_len + 1); // +1 for null terminator
+
+			if (modified_txt)
+			{
+				size_t prefix_len = likes_pos - txt;
+
+				Q_strncpy(modified_txt, txt, prefix_len); // Copy before ": likes "
+				Q_strcpy(modified_txt + prefix_len, ": ^mlikes^m "); // Add formatted "likes"
+				Q_strcpy(modified_txt + prefix_len + strlen(": ^mlikes^m "),
+					likes_pos + strlen(search));
+
+				// Don't copy "likes" messages to lastchat
+				Con_Printf("%s", modified_txt);
+
+				free(modified_txt);
+				return true; // Message was handled
+			}
+		}
+
+		// For non-likes messages, copy to lastchat
+		Q_strncpy(cl.lastchat, txt, sizeof(cl.lastchat) - 1);
+		cl.lastchat[sizeof(cl.lastchat) - 1] = '\0';
+
+		// Reset the console message counter when we store a new chat
+		console_msg_since_lastchat = 0;
+	}
+
+	return false; // Continue normal processing
+}
+
+static void Con_UpdateLastchatCounter(void) // woods #like
+{
+	// Check if we need to clear lastchat due to too many console messages
+	if (cl.lastchat[0] != '\0') {
+		console_msg_since_lastchat++;
+
+		// If 20+ console messages have occurred, clear lastchat
+		if (console_msg_since_lastchat >= 20) {
+			cl.lastchat[0] = '\0';
+			console_msg_since_lastchat = 0;
+		}
+	}
+}
+
 /*
 ================
 Con_Print
@@ -540,11 +706,10 @@ static void Con_Print (const char *txt)
 				strncpy(cl.observer, "y", sizeof(cl.observer));
 		}
 
-		if (strstr(txt, ": ") && cls.signon == SIGNONS && cl.maxclients > 1) // woods #like
-		{ 
-			strncpy(cl.lastchat, txt, sizeof(cl.lastchat) - 1);
-			cl.lastchat[sizeof(cl.lastchat) - 1] = '\0';
-		}
+		if (Con_ProcessPlayerMessage(txt)) // woods #like
+			return;
+
+		Con_UpdateLastchatCounter(); // woods #like
 
 		if (!strcmp(txt, "You receive "))
 
