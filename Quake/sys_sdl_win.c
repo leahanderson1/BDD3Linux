@@ -314,7 +314,9 @@ LRESULT CALLBACK KeyFilter(int nCode, WPARAM wParam, LPARAM lParam)
 
 void Sys_Init (void)
 {
-	OSVERSIONINFO	vinfo;
+	OSVERSIONINFOEX	vinfo;
+	DWORDLONG conditionMask = 0;
+	int op = VER_GREATER_EQUAL;
 
 	Sys_SetTimerResolution ();
 	Sys_SetDPIAware ();
@@ -327,23 +329,37 @@ void Sys_Init (void)
 	 * can be done if necessary, though... */
 	host_parms->userdir = host_parms->basedir; /* code elsewhere relies on this ! */
 
+	// Check for Windows version using VerifyVersionInfo instead of deprecated GetVersionEx
+	memset(&vinfo, 0, sizeof(vinfo));
 	vinfo.dwOSVersionInfoSize = sizeof(vinfo);
 
-	if (!GetVersionEx (&vinfo))
-		Sys_Error ("Couldn't get OS info");
+	// At least Win95 or NT 4.0 is required (4.0)
+	vinfo.dwMajorVersion = 4;
+	vinfo.dwMinorVersion = 0;
+	VER_SET_CONDITION(conditionMask, VER_MAJORVERSION, op);
+	VER_SET_CONDITION(conditionMask, VER_MINORVERSION, op);
 
-	if ((vinfo.dwMajorVersion < 4) ||
-		(vinfo.dwPlatformId == VER_PLATFORM_WIN32s))
-	{
+	if (!VerifyVersionInfo(&vinfo, VER_MAJORVERSION | VER_MINORVERSION, conditionMask))
 		Sys_Error ("QuakeSpasm requires at least Win95 or NT 4.0");
-	}
 
-	if (vinfo.dwPlatformId == VER_PLATFORM_WIN32_NT)
+	// Check if we're on NT platform
+	vinfo.dwPlatformId = VER_PLATFORM_WIN32_NT;
+	VER_SET_CONDITION(conditionMask, VER_PLATFORMID, VER_EQUAL);
+	WinNT = VerifyVersionInfo(&vinfo, VER_PLATFORMID, conditionMask);
+	
+	if (WinNT)
 	{
 		SYSTEM_INFO info;
-		WinNT = true;
-		if (vinfo.dwMajorVersion >= 6)
-			WinVista = true;
+		
+		// Check for Vista or newer (6.0+)
+		memset(&vinfo, 0, sizeof(vinfo));
+		vinfo.dwOSVersionInfoSize = sizeof(vinfo);
+		vinfo.dwMajorVersion = 6;
+		vinfo.dwMinorVersion = 0;
+		conditionMask = 0;
+		VER_SET_CONDITION(conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+		WinVista = VerifyVersionInfo(&vinfo, VER_MAJORVERSION, conditionMask);
+		
 		GetSystemInfo(&info);
 		host_parms->numcpus = info.dwNumberOfProcessors;
 		if (host_parms->numcpus < 1)
@@ -353,13 +369,21 @@ void Sys_Init (void)
 	{
 		WinNT = false; /* Win9x or WinME */
 		host_parms->numcpus = 1;
-		if ((vinfo.dwMajorVersion == 4) && (vinfo.dwMinorVersion == 0))
-		{
-			Win95 = true;
-			/* Win95-gold or Win95A can't switch bpp automatically */
-			if (vinfo.szCSDVersion[1] != 'C' && vinfo.szCSDVersion[1] != 'B')
-				Win95old = true;
-		}
+		
+		// Check for Win95
+		memset(&vinfo, 0, sizeof(vinfo));
+		vinfo.dwOSVersionInfoSize = sizeof(vinfo);
+		vinfo.dwMajorVersion = 4;
+		vinfo.dwMinorVersion = 0;
+		conditionMask = 0;
+		VER_SET_CONDITION(conditionMask, VER_MAJORVERSION, VER_EQUAL);
+		VER_SET_CONDITION(conditionMask, VER_MINORVERSION, VER_EQUAL);
+		Win95 = VerifyVersionInfo(&vinfo, VER_MAJORVERSION | VER_MINORVERSION, conditionMask);
+		
+		/* Unfortunately we can't check for Win95-gold vs Win95A/B/C this way 
+		   since CSDVersion is not supported with VerifyVersionInfo.
+		   Since this OS is so old, let's just assume it's the old version. */
+		Win95old = Win95;
 	}
 	Sys_Printf("Detected %d CPUs.\n", host_parms->numcpus);
 

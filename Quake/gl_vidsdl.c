@@ -1002,7 +1002,10 @@ GL_MakeNiceExtensionsList -- johnfitz
 static void GL_PrintNiceExtensionsList (const char *in)
 {
 	char *copy, *token;
-	if (!in) return Con_SafePrintf("(none)");
+	if (!in) {
+		Con_SafePrintf("(none)");
+		return;
+	}
 
 	copy = (char *) Z_Strdup(in);
 	for (token = strtok(copy, " "); token; token = strtok(NULL, " "))

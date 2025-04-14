@@ -1286,7 +1286,7 @@ static void TexMgr_LoadImage32 (gltexture_t *glt, unsigned *data)
 		{ 
 			if (gl_max_size.value < 0) // woods - grayscale for negative values
 			{ 
-				for (int i = 0; i < (glt->width * glt->height); i++)
+				for (unsigned int i = 0; i < (glt->width * glt->height); i++)
 				{
 					unsigned char* pixel = (unsigned char*)&data[i];
 					// Calculate luminance

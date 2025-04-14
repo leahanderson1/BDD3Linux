@@ -103,12 +103,13 @@ A sky texture is 256*128, with the left side being a masked overlay
 void Sky_LoadTexture (qmodel_t *mod, texture_t *mt, enum srcformat fmt, unsigned int srcwidth, unsigned int height)
 {
 	char		texturename[64];
-	int			i, p, r, g, b, count;
+	int p, r, g, b, count;
+	unsigned int i;
 	byte		*src;
 	byte	*front_data;
 	byte	*back_data;
 	unsigned	*rgba;
-	int rows, columns;
+	unsigned int rows, columns;
 	int bb,bw,bh;
 	int width = srcwidth/2;
 

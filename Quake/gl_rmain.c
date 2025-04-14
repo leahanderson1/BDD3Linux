@@ -1305,7 +1305,7 @@ loc0:
 	{
 		// Didn't hit anything so ...
 
-		int		i;
+		unsigned int		i;
 		surf = cl.worldmodel->surfaces + node->firstsurface;
 
 		// check for impact on this node

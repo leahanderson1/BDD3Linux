@@ -268,9 +268,9 @@ qpic_t *Draw_PicFromWad2 (const char *name, unsigned int texflags)
 		texnum = Scrap_AllocBlock (p->width + SCRAP_PADDING, p->height + SCRAP_PADDING, &x, &y); // woods iw
 		scrap_dirty = true;
 		k = 0;
-		for (i=0 ; i<p->height ; i++)
+		for (i=0 ; i<(int)p->height ; i++)
 		{
-			for (j=0 ; j<p->width ; j++, k++)
+			for (j=0 ; j<(int)p->width ; j++, k++)
 				scrap_texels[texnum][(y+i)*BLOCK_WIDTH + x + j] = p->data[k];
 		}
 		gl.gltexture = scrap_textures[texnum]; //johnfitz -- changed to an array

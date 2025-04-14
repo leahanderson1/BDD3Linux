@@ -4121,7 +4121,7 @@ static void PF_buf_cvarlist(void)
 	size_t bufno = G_FLOAT(OFS_PARM0)-BUFSTRBASE;
 	const char *pattern = G_STRING(OFS_PARM1);
 	const char *antipattern = G_STRING(OFS_PARM2);
-	int i;
+	unsigned int i;
 	cvar_t	*var;
 	int plen = strlen(pattern), alen = strlen(antipattern);
 	qboolean pwc = strchr(pattern, '*')||strchr(pattern, '?'),
@@ -4270,6 +4270,7 @@ static void PF_findchain(void)
 	int cfld;
 
 	chain = (edict_t *)qcvm->edicts;
+	ent = NEXT_EDICT(qcvm->edicts);
 
 	f = G_INT(OFS_PARM0);
 	s = G_STRING(OFS_PARM1);
@@ -4326,6 +4327,7 @@ static void PF_findchainfloat(void)
 	int cfld;
 
 	chain = (edict_t *)qcvm->edicts;
+	ent = NEXT_EDICT(qcvm->edicts);
 
 	f = G_INT(OFS_PARM0);
 	s = G_FLOAT(OFS_PARM1);
@@ -4382,6 +4384,7 @@ static void PF_findchainflags(void)
 	int cfld;
 
 	chain = (edict_t *)qcvm->edicts;
+	ent = NEXT_EDICT(qcvm->edicts);
 
 	f = G_INT(OFS_PARM0);
 	s = G_FLOAT(OFS_PARM1);
@@ -7344,7 +7347,7 @@ static void PF_checkpvs (void)
 
 	mleaf_t *leaf = Mod_PointInLeaf (org, qcvm->worldmodel);
 	byte *pvs = Mod_LeafPVS (leaf, qcvm->worldmodel); //johnfitz -- worldmodel as a parameter
-	int i;
+	unsigned int i;
 
 	for (i=0 ; i < ed->num_leafs ; i++)
 	{

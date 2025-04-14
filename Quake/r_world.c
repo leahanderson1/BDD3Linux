@@ -1558,7 +1558,7 @@ dynamic:
 
 static int RSceneCache_Thread(void *ctx)
 {
-	int i, j, e;
+	unsigned int i, j, e;
 	mleaf_t *leaf;
 	msurface_t **mark, *surf;
 	struct rscenecache_s *cache;
@@ -1603,7 +1603,7 @@ static int RSceneCache_Thread(void *ctx)
 				if (vis[i>>3] & (1<<(i&7)))
 				{
 					if (leaf->contents != CONTENTS_SKY || r_oldskyleaf.value)
-						for (j=0, mark = leaf->firstmarksurface; j<leaf->nummarksurfaces; j++, mark++)
+						for (j=0, mark = leaf->firstmarksurface; j<(unsigned int)leaf->nummarksurfaces; j++, mark++)
 						{
 							surf = *mark;
 							if (surf->visframe != visframecount)
@@ -1615,7 +1615,7 @@ static int RSceneCache_Thread(void *ctx)
 									continue;	//ignore any buggy degenerate ones.
 								if ((unsigned)(surf->lightmaptexturenum+1) >= cache->lightmaps)
 									continue;	//wtf
-								if (surf->texinfo->materialidx >= cache->numtextures)
+								if ((unsigned int)surf->texinfo->materialidx >= cache->numtextures)
 									continue;	//should have been sanitised at load.
 								numidx = (surf->numedges-2)*3;
 								batch = &cache->batches[surf->texinfo->materialidx*cache->lightmaps + 1+surf->lightmaptexturenum];
@@ -1626,7 +1626,7 @@ static int RSceneCache_Thread(void *ctx)
 								}
 								idx = &batch->idx[batch->numidx];
 								batch->numidx += numidx;
-								for (e = 2; e < surf->numedges; e++)
+								for (e = 2; e < (unsigned int)surf->numedges; e++)
 								{
 									*idx++ = surf->vbo_firstvert;
 									*idx++ = surf->vbo_firstvert + e-1;
@@ -1656,14 +1656,14 @@ static int RSceneCache_Thread(void *ctx)
 					}
 
 				//FIXME: these should really use MultiDrawIndirect, so we can add/remove them more cheaply.
-				for (j=0, surf = cache->worldmodel->surfaces+sub->firstface; j<sub->numfaces; j++, surf++)
+				for (j=0, surf = cache->worldmodel->surfaces+sub->firstface; j<(unsigned int)sub->numfaces; j++, surf++)
 				{	//don't bother with visframe checks here. a) we shouldn't be getting dupes anyway. b) we don't want to trip up the regular rendering if its rendering a moving copy while we're generating a new cache.
 					bpolys++;
 					if (surf->numedges < 3)
 						continue;	//ignore any buggy degenerate ones.
 					if ((unsigned)(surf->lightmaptexturenum+1) >= cache->lightmaps)
 						continue;	//wtf
-					if (surf->texinfo->materialidx >= cache->numtextures)
+					if ((unsigned int)surf->texinfo->materialidx >= cache->numtextures)
 						continue;	//should have been sanitised at load.
 					numidx = (surf->numedges-2)*3;
 					batch = &cache->batches[surf->texinfo->materialidx*cache->lightmaps + 1+surf->lightmaptexturenum];
@@ -1674,7 +1674,7 @@ static int RSceneCache_Thread(void *ctx)
 					}
 					idx = &batch->idx[batch->numidx];
 					batch->numidx += numidx;
-					for (e = 2; e < surf->numedges; e++)
+					for (e = 2; e < (unsigned int)surf->numedges; e++)
 					{
 						*idx++ = surf->vbo_firstvert;
 						*idx++ = surf->vbo_firstvert + e-1;
@@ -1744,12 +1744,12 @@ static qboolean RSceneCache_Queue(byte *vis)
 	{
 		struct cl_static_entities_s *test = &cl.static_entities[e];
 		entity_t *pent = test->ent;
-		int i;
 
 		if (pent->model && cl_numvisedicts < cl_maxvisedicts)
 		{
 			if (test->num_clusters<=MAX_ENT_LEAFS)
 			{
+				unsigned int i;
 				for (i=0 ; i < test->num_clusters ; i++)
 					if (vis[test->clusternums[i] >> 3] & (1 << (test->clusternums[i]&7) ))
 						break;
@@ -1957,6 +1957,7 @@ static qboolean RSceneCache_Queue(byte *vis)
 				link = &(*link)->next;
 			}
 
+			unsigned int e;
 			for (e = 0; e < cache->numtextures*cache->lightmaps; e++)
 				cache->batches[e].numidx = 0;
 		}
@@ -2075,7 +2076,7 @@ void RSceneCache_Cleanup(qmodel_t *mod)
 static void RSceneCache_Finish(struct rscenecache_s *cache)
 {
 #define USEMAPBUFFER
-	int i;
+	unsigned int i;
 	size_t numidx;
 #ifdef USEMAPBUFFER
 	byte *ebomem = NULL;
@@ -2151,7 +2152,7 @@ static void RSceneCache_Draw(qboolean water)
 {
 	extern GLuint gl_bmodel_vbo;
 	struct rscenecache_s *cache = rscenecache.drawing;
-	int i, j;
+	unsigned int i, j;
 	texture_t *tex;
 	int b;
 	int mode;
@@ -2340,7 +2341,7 @@ static void RSceneCache_Draw(qboolean water)
 qboolean RSceneCache_HasSky(void)
 {
 	struct rscenecache_s *cache = rscenecache.drawing;
-	int i;
+	unsigned int i;
 	texture_t *tex;
 
 	if (cache)
@@ -2361,7 +2362,7 @@ qboolean RSceneCache_DrawSkySurfDepth(void)
 	struct rscenecache_s *cache = rscenecache.drawing;
 
 	extern GLuint gl_bmodel_vbo;
-	int i, j;
+	unsigned int i, j;
 	texture_t *tex;
 	qboolean ret = false;
 

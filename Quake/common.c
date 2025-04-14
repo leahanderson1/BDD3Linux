@@ -2927,9 +2927,9 @@ of the list so they override previous pack files.
 static pack_t *COM_LoadPackFile (const char *packfile)
 {
 	dpackheader_t	header;
-	int		i;
+	unsigned int i;
 	packfile_t	*newfiles;
-	int		numpackfiles;
+	unsigned int numpackfiles;
 	pack_t		*pack;
 	int		packhandle;
 	dpackfile_t	info[MAX_FILES_IN_PACK];

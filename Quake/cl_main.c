@@ -2462,7 +2462,7 @@ void CL_Entdump_f(void)
 	char bspfilename[MAX_OSPATH];
 
 	// Build full BSP path
-	if (q_snprintf(bspfilename, sizeof(bspfilename), "maps/%s.bsp", cleaned_mapname) >= sizeof(bspfilename))
+	if ((size_t)q_snprintf(bspfilename, sizeof(bspfilename), "maps/%s.bsp", cleaned_mapname) >= sizeof(bspfilename))
 	{
 		Con_Printf("map name too long\n");
 		return;
@@ -2526,7 +2526,7 @@ void CL_Entdump_f(void)
 	}
 
 	// Validate entity lump position
-	if (entlump->fileofs < 0 || entlump->fileofs + entlump->filelen > length)
+	if (entlump->fileofs < 0 || entlump->fileofs + entlump->filelen >(unsigned int)length)
 	{
 		free(buffer);
 		Con_Printf("invalid entity lump in %s\n", bspfilename);
@@ -2540,13 +2540,13 @@ void CL_Entdump_f(void)
 	q_snprintf(entfilename, sizeof(entfilename), "%s.ent", cleaned_mapname);
 
 	// Find the actual length of valid entity text
-	int text_length = 0;
+	size_t text_length = 0;
 	while (text_length < entlump->filelen && entities_data[text_length])
 		text_length++;
 
 	// Basic validation - check for either '{' or '//' to indicate valid entity data
 	qboolean valid_start = false;
-	for (int i = 0; i < text_length - 1; i++) {
+	for (size_t i = 0; i < text_length - 1; i++) {
 		if (entities_data[i] == '{' || (entities_data[i] == '/' && entities_data[i + 1] == '/')) {
 			valid_start = true;
 			break;

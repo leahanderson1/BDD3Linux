@@ -601,7 +601,7 @@ static void *Q1BSPX_FindLump(char *lumpname, int *lumpsize)
 static void Q1BSPX_Setup(qmodel_t *mod, char *filebase, unsigned int filelen, lump_t *lumps, int numlumps)
 {
 	int i;
-	int offs = 0;
+	unsigned int offs = 0;
 	bspx_header_t *h;
 	qboolean misaligned = false;
 
@@ -687,7 +687,7 @@ static texture_t *Mod_LoadMipTex(miptex_t *mt, byte *lumpend, enum srcformat *fm
 	for (extdata+=4; extdata+8 < lumpend; extdata += sz)
 	{
 		sz = (extdata[0]<<0)|(extdata[1]<<8)|(extdata[2]<<16)|(extdata[3]<<24);
-		if (sz < 8 || sz > lumpend-extdata)	break;	//bad! bad! bad!
+		if (sz < 8 || sz >(size_t)(lumpend-extdata))	break;	//bad! bad! bad!
 		else if (sz <= 16)	continue;	//nope, no idea
 
 		*fmt = TexMgr_FormatForCode((char*)extdata+4);
@@ -826,7 +826,7 @@ static void Mod_LoadTextures (lump_t *l)
 		m->dataofs[i] = LittleLong(m->dataofs[i]);
 		if (m->dataofs[i] == -1)
 			continue;
-		if (m->dataofs[i] >= mipend)
+		if ((unsigned int)m->dataofs[i] >= mipend)
 			mipend = l->filelen;	//o.O something weird!
 		mt = (miptex_t *)((byte *)m + m->dataofs[i]);
 		mt->width = LittleLong (mt->width);
@@ -1200,7 +1200,7 @@ static void Mod_LoadLighting (lump_t *l)
 		in = mod_base + l->fileofs;
 		out = loadmodel->lightdata;
 
-		for (i = 0;i < (l->filelen / 2) ;i++)
+		for (unsigned int i = 0;i < (l->filelen / 2) ;i++)
 		{
 			q64_b0 = *in++;
 			q64_b1 = *in++;
@@ -1240,7 +1240,7 @@ static void Mod_LoadLighting (lump_t *l)
 		in = loadmodel->lightdata + l->filelen*2; // place the file at the end, so it will not be overwritten until the very last write
 		out = loadmodel->lightdata;
 		memcpy (in, mod_base + l->fileofs, l->filelen);
-		for (i = 0;i < l->filelen;i++)
+		for (unsigned int i = 0;i < l->filelen;i++)
 		{
 			d = *in++;
 			*out++ = d;
@@ -3069,8 +3069,8 @@ qboolean Mod_LoadMapDescription(char* desc, size_t maxchars, const char* map)
 		((int*)&header)[i] = LittleLong(((int*)&header)[i]);
 
 	entlump = &header.lumps[LUMP_ENTITIES];
-	if (entlump->filelen < 0 || entlump->filelen >= filesize ||
-		entlump->fileofs < 0 || entlump->fileofs + entlump->filelen > filesize)
+	if ((int)entlump->filelen < 0 || (int)entlump->filelen >= filesize ||
+		(int)entlump->fileofs < 0 || (int)entlump->fileofs + (int)entlump->filelen > filesize)
 	{
 		fclose(f);
 		return false;
