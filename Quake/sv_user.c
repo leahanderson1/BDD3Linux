@@ -823,6 +823,7 @@ qboolean SV_ReadClientMessage (void)
 
 		case clc_stringcmd:
 			s = MSG_ReadString ();
+			if (!q_strncasecmp(s, "spawn", 5)) 
 			if (q_strncasecmp(s, "spawn", 5) && q_strncasecmp(s, "begin", 5) && q_strncasecmp(s, "prespawn", 8) && qcvm->extfuncs.SV_ParseClientCommand)
 			{	//the spawn/begin/prespawn are because of numerous mods that disobey the rules.
 				//at a minimum, we must be able to join the server, so that we can see any sprints/bprints (because dprint sucks, yes there's proper ways to deal with this, but moders don't always know them).

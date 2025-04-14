@@ -367,5 +367,7 @@ void SV_SpawnServer (const char *server);
 
 void SV_SetupSkyRoom(char *value);
 
+void SV_CheckDuplicateNames(client_t* client); // woods #dupnames
+
 #endif	/* _QUAKE_SERVER_H */
 

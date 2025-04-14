@@ -2268,6 +2268,70 @@ void SV_Pext_f(void)
 	}
 }
 
+void SV_CheckDuplicateNames (client_t* client) // woods #dupnames
+{
+	size_t i;
+	unsigned int dupc = 1;
+	char newname[32], tmpname[32], * p;
+	client_t* cl;
+	size_t namelen;
+
+	if (!client->name[0])
+		return;
+
+	q_strlcpy(newname, client->name, sizeof(newname));
+
+	while (1)
+	{		
+		for (i = 0, cl = svs.clients; i < (size_t)svs.maxclients; i++, cl++)
+		{ // Check for duplicate names
+			if (!cl->active || cl == client)
+				continue;
+			if (!q_strcasecmp(cl->name, newname))
+				break;
+		}
+
+		if (i == (size_t)svs.maxclients)
+			break;  // no duplicate found
+
+		p = newname;
+
+		if (newname[0] == '(')
+		{ // Check if name already has a numeric prefix and strip it
+			if (newname[2] == ')')
+				p = newname + 3;
+			else if (newname[3] == ')')
+				p = newname + 4;
+		}
+
+		q_strlcpy(tmpname, p, sizeof(tmpname));
+
+		// Check if we have enough space for prefix
+		namelen = strlen(tmpname);
+		if (namelen + 5 >= sizeof(newname))  // "(xxx)" needs 5 chars max
+		{
+			tmpname[sizeof(newname) - 5] = 0; // Truncate base name to make room for prefix
+		}
+
+		// Add new numeric prefix with safe snprintf
+		if (dupc < 10)
+			q_snprintf(newname, sizeof(newname), "(%u)%s", dupc++, tmpname);
+		else if (dupc < 100)
+			q_snprintf(newname, sizeof(newname), "(%u)%s", dupc++, tmpname);
+		else
+			break; // Prevent excessive duplicates
+
+		newname[sizeof(newname) - 1] = 0;
+	}
+
+	// If name changed, update client name and userinfo safely
+	if (strcmp(client->name, newname))
+	{
+		q_strlcpy(client->name, newname, sizeof(client->name));
+		Info_SetKey(client->userinfo, sizeof(client->userinfo), "name", client->name);
+	}
+}
+
 /*
 ================
 SV_ConnectClient

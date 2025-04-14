@@ -2816,6 +2816,7 @@ static void SV_DecodeUserInfo(client_t *client)
 			Con_Printf ("%s renamed to %s\n", host_client->name, tmp);
 		Q_strcpy (host_client->name, tmp);
 		client->edict->v.netname = PR_SetEngineString(client->name);
+		SV_CheckDuplicateNames(client); // woods #dupnames
 	}
 }
 void SV_UpdateInfo(int edict, const char *keyname, const char *value)
@@ -2858,7 +2859,12 @@ void SV_UpdateInfo(int edict, const char *keyname, const char *value)
 	{	//its changed. actually broadcast it.
 		Info_SetKey(info, infosize, keyname, value);
 		if (infoplayer)
+		{
 			SV_DecodeUserInfo(infoplayer);
+
+			if (!strcmp(keyname, "name") && infoplayer->name[0]) // woods #dupnames
+				SV_CheckDuplicateNames(infoplayer);
+		}
 
 		if (*keyname == '_' || !sv.active)
 			return;	//underscore means private (user) keys. these are not networked to clients.
