@@ -32,6 +32,7 @@ extern char mute[2];			// woods for mute to memory #usermute
 int	fragsort[MAX_SCOREBOARD]; // woods #scrping
 int	scoreboardlines; // woods #scrping
 extern char	lastmphost[NET_NAMELEN]; // woods
+qboolean WordFilter_Check(const char* text, char* dest_buffer, size_t buffer_size); // woods #contentfilter
 
 #define STAT_MINUS		10	// num frame for '-' stats digit
 
@@ -2321,6 +2322,15 @@ void Sbar_DeathmatchOverlay (void)
 		if (!s->name[0])
 			continue;
 
+		char filtered_name[32];
+		qboolean was_filtered = false;
+
+		if (cl_contentfilter.value == 2) // woods #contentfilter
+		{
+			was_filtered = WordFilter_Check(s->name, filtered_name, sizeof(filtered_name));
+			filtered_name[sizeof(filtered_name) - 1] = '\0';
+		}
+
 		char qfReady[6] = { 210, 229, 225, 228, 249, '\0' }; // quake font red 'Ready'
 
 		if (cl.modtype == 1 || cl.modtype == 4) // woods -- dynamic status flash scoreboard label if not ready #smartstatus
@@ -2406,7 +2416,14 @@ void Sbar_DeathmatchOverlay (void)
 			M_PrintWhite (x + 64, y, shortname); //johnfitz -- was Draw_String, changed for stretched overlays // woods changed to white #scoreboard
 		}
 		else*/
-		M_PrintWhite (x + 64, y, s->name); //johnfitz -- was Draw_String, changed for stretched overlays // woods changed to white #scoreboard
+
+		if (cl_contentfilter.value == 2 && was_filtered) // woods #contentfilter
+		{
+			M_PrintWhite(x + 64, y, filtered_name);
+		}
+		else {
+			M_PrintWhite(x + 64, y, s->name); //johnfitz -- was Draw_String, changed for stretched overlays // woods changed to white #scoreboard
+		}
 		
 		y += 10;
 	}

@@ -450,8 +450,15 @@ static void TexMgr_Imagedump_f (void)
 		count++; // woods add filter (ironwail)
 	}
 
-	if (filter) // woods add filter (ironwail)
+	if (filter)
+	{
+		if (cl_contentfilter.value) // woods #contentfilter
+			Con_Printf("dumped %i textures containing '%s' to %s/imagedump.\n", count, filter, COM_SkipPath(com_gamedir));
+		else
 		Con_Printf("dumped %i textures containing '%s' to %s\n", count, filter, dirname);
+	}
+	else if (cl_contentfilter.value) // woods #contentfilter
+		Con_Printf("dumped %i textures to %s/imagedump.\n", count, COM_SkipPath(com_gamedir));
 	else
 		Con_Printf("dumped %i textures to %s\n", count, dirname);
 }

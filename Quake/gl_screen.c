@@ -207,6 +207,7 @@ qboolean	cameras; // woods #crxcamera
 qboolean	qeintermission; // woods #qeintermission
 qboolean draw; // woods #crxcamera #qeintermission
 qboolean crxintermission; // woods #crxintermission
+extern qboolean WordFilter_Check(const char* text, char* dest_buffer, size_t buffer_size); // woods #contentfilter
 
 /*
 ==============
@@ -556,6 +557,22 @@ void SCR_DrawCenterString (void) //actually do the drawing
 		GL_SetCanvas(CANVAS_OBSERVER); //johnfitz //  center print moved down near weapon
 	else
 		GL_SetCanvas(CANVAS_MOD); //johnfitz // woods messages scale with console font size instead
+
+	char filtered_centerstring[1024];
+	if (cl_contentfilter.value == 2) // woods #contentfilter
+	{
+		if (WordFilter_Check(scr_centerstring, filtered_centerstring, sizeof(filtered_centerstring))) {
+			// Ensure the filtered string is null-terminated
+			filtered_centerstring[sizeof(filtered_centerstring) - 1] = '\0';
+			start = filtered_centerstring;
+		}
+		else {
+			start = scr_centerstring;
+		}
+	}
+	else {
+		start = scr_centerstring;
+	}
 
 // the finale prints the characters one at a time
 	if (cl.intermission)
@@ -2137,7 +2154,21 @@ void SCR_ShowObsFrags(void)
 				Draw_Character(x + 24, y, num[2]);
 
 				// name
+				char filtered_name[32];
+				qboolean was_filtered = false;
+
+				if (cl_contentfilter.value == 2) // woods #contentfilter
+				{
+					was_filtered = WordFilter_Check(s->name, filtered_name, sizeof(filtered_name));
+					filtered_name[sizeof(filtered_name) - 1] = '\0';
+				}
+
+				// Get the short name and respect content filter setting
+				if (cl_contentfilter.value == 2 && was_filtered) // woods #contentfilter
+					getShortName(filtered_name, shortname);
+				else
 				getShortName(s->name, shortname);
+
 				M_PrintWhite(x + 50, y, shortname);
 
 				// Only draw items if cl.modtype == 1 and !cl.notobserver
@@ -3813,6 +3844,8 @@ void SCR_DrawAutoID(void)
 	char formatted_name[16]; // 15 chars + null terminator
 	int name_length;
 	int y_offset = 12;
+	char filtered_name[16]; // Buffer for filtered name
+	qboolean was_filtered = false; // Flag if filtering occurred
 
 	float alpha = scr_autoid.value;
 	int integer_part = (int)alpha;
@@ -3842,7 +3875,15 @@ void SCR_DrawAutoID(void)
 			y -= y_offset;
 		}
 
-		q_snprintf(formatted_name, sizeof(formatted_name), "%.15s", autoids[i].player->name);
+		if (cl_contentfilter.value == 2) // woods #contentfilter
+		{
+			was_filtered = WordFilter_Check(autoids[i].player->name, filtered_name, sizeof(filtered_name));
+			filtered_name[sizeof(filtered_name) - 1] = '\0'; 
+		}
+
+		const char* name_to_use = (cl_contentfilter.value == 2 && was_filtered) ? filtered_name : autoids[i].player->name;
+
+		q_snprintf(formatted_name, sizeof(formatted_name), "%.15s", name_to_use);
 
 		TrimTrailingSpaces(formatted_name);
 

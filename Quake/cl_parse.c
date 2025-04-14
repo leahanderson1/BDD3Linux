@@ -3395,7 +3395,7 @@ filter_word_t filter_words[] = {
 	{"a55h013", "person", false},
 	{"a55h0le", "person", false},
 	{"abo", "person", true},
-	{"af", "very", false},
+	{"af", "very", true},
 	{"anus", "snus", false},
 	{"arse", "bummer", false},
 	{"ass", "***", true},
@@ -3418,7 +3418,7 @@ filter_word_t filter_words[] = {
 	{"blow my brains", "clear my mind", false},
 	{"boong", "person", false},
 	{"broad", "person", true},
-	{"bs", "nonsense", false},
+	{"bs", "nonsense", true},
 	{"bullshit", "nonsense", false},
 	{"butt", "****", false},
 	{"c0ck5uck3r", "person", false},
@@ -3427,6 +3427,7 @@ filter_word_t filter_words[] = {
 	{"chinaman", "person", false},
 	{"chink", "neighbor", false},
 	{"cock", "****", false},
+	{"cok", "***", true},
 	{"coconut", "fruit", true},
 	{"coon", "raccoon", true},
 	{"cooned", "raccoon", false},
@@ -3485,7 +3486,7 @@ filter_word_t filter_words[] = {
 	{"fcuk", "fun", false},
 	{"fggt", "hawk", false},
 	{"fgt", "yam", true},
-	{"fk", "heck", false},
+	{"fk", "heck", true},
 	{"fking", "freaking", false},
 	{"fkn", "freaking", false},
 	{"floozy", "person", false},
@@ -3493,7 +3494,7 @@ filter_word_t filter_words[] = {
 	{"foad", "go away", false},
 	{"fok", "fun", false},
 	{"ftm", "person", false},
-	{"fu", "forget", false},
+	{"fu", "forget", true},
 	{"fuc", "fun", false},
 	{"fuck", "f**k", false},
 	{"fucking", "cheddar", false},
@@ -3553,7 +3554,7 @@ filter_word_t filter_words[] = {
 	{"ladyboy", "person", false},
 	{"lame", "weak", true},
 	{"lmfao", "haha", false},
-	{"mf", "friend", false},
+	{"mf", "friend", true},
 	{"mfer", "person", false},
 	{"mick", "buddy", true},
 	{"micks", "buddies", false},
@@ -3597,7 +3598,7 @@ filter_word_t filter_words[] = {
 	{"polack", "person", false},
 	{"poof", "magic", true},
 	{"poofter", "person", false},
-	{"pos", "piece", false},
+	{"pos", "piece", true},
 	{"psycho", "person", false},
 	{"puss", "cat", true},
 	{"pusses", "cats", false},
@@ -3631,7 +3632,7 @@ filter_word_t filter_words[] = {
 	{"slattern", "person", false},
 	{"slit my wrists", "call a friend", false},
 	{"slut", "person", false},
-	{"sob", "son", false},
+	{"sob", "son", true},
 	{"spade", "person", true},
 	{"spastic", "person", false},
 	{"spaz", "person", false},
@@ -3683,91 +3684,148 @@ filter_word_t filter_words[] = {
 char* String_Edit_Normalize_Text(const char* text)
 {
 	static char normalized_buffer[MAXCMDLINE];
-	char* cur = normalized_buffer;
-
 	q_strlcpy(normalized_buffer, text, MAXCMDLINE);
 
-	for (; *cur; cur++)
+	size_t i = 0, j = 0;
+	while (normalized_buffer[i] != '\0' && j < MAXCMDLINE - 1)
 	{
-		if ((unsigned char)*cur > 128) *cur -= 128;
-		*cur = tolower(*cur);
+		// Check if the current token is purely numeric.
+		if (isdigit((unsigned char)normalized_buffer[i]))
+		{
+			size_t k = i;
+			int all_numeric = 1;
+			while (normalized_buffer[k] != '\0' && !isspace((unsigned char)normalized_buffer[k]))
+			{
+				if (!isdigit((unsigned char)normalized_buffer[k]))
+				{
+					all_numeric = 0;
+					break;
+				}
+				k++;
+			}
+			if (all_numeric)
+			{
+				// Copy the numeric token unchanged.
+				while (normalized_buffer[i] != '\0' &&
+					!isspace((unsigned char)normalized_buffer[i]) &&
+					j < MAXCMDLINE - 1)
+				{
+					normalized_buffer[j++] = normalized_buffer[i++];
+				}
+				continue;  // Go to the next character after the token.
+			}
+		}
 
-		switch (*cur) {
-		case '4': case '@': *cur = 'a'; break;
-		case '3': *cur = 'e'; break;
-		case '1': case '!': *cur = 'i'; break;
-		case '0': *cur = 'o'; break;
-		case '5': case '$': *cur = 's'; break;
-		case '7': *cur = 't'; break;
-		case '+': *cur = 't'; break;
-		case '8': *cur = 'b'; break;
-		case '6': *cur = 'g'; break;
-		case '9': *cur = 'g'; break;
-		case '2': *cur = 'z'; break;
-			// Remove common punctuation used to bypass filters
+		// Process non-numeric (or mixed) characters.
+		unsigned char c = normalized_buffer[i];
+		if (c > 128)
+			c -= 128;
+		c = tolower(c);
+
+		switch (c)
+		{
+		case '4': case '@': c = 'a'; break;
+		case '3': c = 'e'; break;
+		case '1': case '!': c = 'i'; break;
+		case '0': c = 'o'; break;
+		case '5': case '$': c = 's'; break;
+		case '7': case '+': c = 't'; break;
+		case '8': c = 'b'; break;
+		case '6': case '9': c = 'g'; break;
+		case '2': c = 'z'; break;
+			// Remove common punctuation used to bypass filters.
 		case '.': case ',': case '-': case '_': case '*':
 		case '\'': case '"': case '`': case '\\': case '/':
-			*cur = ' '; break;
+			c = ' '; break;
 		}
+		normalized_buffer[j++] = c;
+		i++;
 	}
-
+	normalized_buffer[j] = '\0';
 	return normalized_buffer;
 }
 
 qboolean WordFilter_Check(const char* text, char* dest_buffer, size_t buffer_size)
 {
-	const char* norm_text = String_Edit_Normalize_Text(text);
-	qboolean replacement = false;
+	// 1) Create a normalized copy of the entire input
+	char norm_text[MAXCMDLINE];
+	strcpy(norm_text, String_Edit_Normalize_Text(text));
 
-	// Initialize destination with original text
-	q_strlcpy(dest_buffer, text, buffer_size);
+	size_t dest_index = 0;
+	size_t i = 0;
+	size_t text_len = strlen(text);
+	qboolean replaced_any = false;
 
-	// Create a working copy for word boundary checks
-	char working_copy[MAXCMDLINE];
-	q_strlcpy(working_copy, norm_text, sizeof(working_copy));
-
-	for (int i = 0; filter_words[i].word != NULL; i++)
+	while (i < text_len && dest_index < buffer_size - 1)
 	{
-		const char* word = filter_words[i].word;
-		const char* replace = filter_words[i].replacement;
-		int word_len = strlen(word);
-		int replace_len = strlen(replace);
+		qboolean match_found = false;
 
-		// Search for all instances of the word
-		char* curword = working_copy;
-		while ((curword = strstr(curword, word)))
+		// Check all filter words at position i
+		for (int j = 0; filter_words[j].word != NULL; j++)
+	{
+			const char* fword = filter_words[j].word;
+			const char* replacement = filter_words[j].replacement;
+			int word_len = strlen(fword);
+
+			// Enough room left in input to match fword?
+			if (i + word_len > text_len)
+				continue;
+
+			// Compare norm_text[i..(i+word_len)] vs filter_word
+			if (strncmp(&norm_text[i], fword, word_len) == 0)
 		{
-			// Check for whole word match if required
-			qboolean is_match = true;
-			if (filter_words[i].whole_word)
+				// If 'whole_word' is set, check boundaries in norm_text
+				if (filter_words[j].whole_word)
 			{
-				// Check if word boundaries exist
-				qboolean has_left_boundary = (curword == working_copy || !isalnum(*(curword - 1)));
-				qboolean has_right_boundary = (*(curword + word_len) == '\0' || !isalnum(*(curword + word_len)));
-				is_match = has_left_boundary && has_right_boundary;
+					// left boundary
+					qboolean left_ok = (i == 0);
+					if (!left_ok && i > 0)
+					{
+						left_ok = !isalnum((unsigned char)norm_text[i - 1]);
 			}
 
-			if (is_match)
+					// right boundary
+					qboolean right_ok = (i + word_len >= text_len);
+					if (!right_ok && (i + word_len) < text_len)
 			{
-				int replace_offset = curword - working_copy;
-				replacement = true;
+						right_ok = !isalnum((unsigned char)norm_text[i + word_len]);
+					}
 
-				// Make sure we don't overflow the buffer
-				if (replace_offset + replace_len < buffer_size)
+					if (!left_ok || !right_ok)
+						continue;  // boundary check failed
+				}
+
+				// If we get here, we have a match (including boundary check)
+				// Copy replacement into dest_buffer if there's room
+				size_t repl_len = strlen(replacement);
+				if (dest_index + repl_len < buffer_size)
 				{
-					memcpy(&dest_buffer[replace_offset], replace, replace_len);
-
-					// Mark as processed in working copy to avoid double-processing
-					memset(curword, ' ', word_len);
+					memcpy(dest_buffer + dest_index, replacement, repl_len);
+					dest_index += repl_len;
+					i += word_len;
+					replaced_any = true;
+					match_found = true;
+					break;  // no need to check other filter words
+				}
+				else
+				{
+					// Not enough space for replacement
+					dest_buffer[buffer_size - 1] = '\0';
+					return replaced_any;
+				}
 				}
 			}
 
-			// Move past this instance
-			curword += word_len;
+		// If no filter word matched at position i, copy original char
+		if (!match_found)
+		{
+			dest_buffer[dest_index++] = text[i++];
 		}
 	}
 
-	return replacement;
+	// Null-terminate
+	dest_buffer[dest_index < buffer_size ? dest_index : buffer_size - 1] = '\0';
+	return replaced_any;
 }
 
 /*
@@ -3880,6 +3938,8 @@ void CL_ParseServerMessage (void)
 
 			if (cl_contentfilter.value == 2 && WordFilter_Check(s, filtered_buffer, sizeof(filtered_buffer))) 
 			{
+				filtered_buffer[sizeof(filtered_buffer) - 1] = '\0';
+
 				if (!CL_ParseProQuakeString(filtered_buffer))
 					CL_ParsePrint(filtered_buffer);
 			}
