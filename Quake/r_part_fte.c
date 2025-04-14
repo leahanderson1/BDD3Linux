@@ -6492,7 +6492,9 @@ static void R_AddTSparkParticle(scenetris_t *t, particle_t *p, plooks_t *type)
 			length *= type->stretch;	//velocity multiplier
 		else
 		{
-//			length *= 0.05;				//fallback
+			Con_DPrintf("Warning: PT_TEXTUREDSPARK particle missing stretch value, using fallback 0.05\n"); // woods
+			length *= 0.05;				//fallback
+		}
 
 		if (length < halfscale * type->minstretch)
 			length = halfscale * type->minstretch;
