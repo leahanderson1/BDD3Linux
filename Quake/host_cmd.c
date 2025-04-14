@@ -3282,11 +3282,20 @@ static void Host_Name_f (void)
 			return;
 		}
 
+		// Check if this is the first time setting the name (default is "player")
+		const char* default_name = "player";
+		qboolean is_first_time = (Q_strcmp(cl_name.string, default_name) == 0 && Q_strcmp(newName, default_name) != 0);
+
 		Cvar_Set ("name", newName);
+
+		// Only print the message if it's not the first time setting the name
+		if (!is_first_time) 
+		{
 		Con_Printf("\n\"name\" changed to \"%s\"", newName);
 		if (truncated)
 			Con_Printf(" (truncated to 15 characters)");
 		Con_Printf("\n\n");
+	}
 	}
 	else
 		SV_UpdateInfo((host_client-svs.clients)+1, "name", newName);
