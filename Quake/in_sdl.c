@@ -104,6 +104,10 @@ static int buttonremap[] =
 /* total accumulated mouse movement since last frame */
 static int	total_dx, total_dy = 0;
 
+static Uint32 obs_cursor_last_move = 0; // ms timestamp of last motion / click -- woods #eyemouse
+static qboolean obs_cursor_hidden = false; // SDL_ShowCursor() state we forced -- woods #eyemouse
+#define OBS_CURSOR_IDLE_MS 2000 // 2 seconds -- woods #eyemouse
+
 #if 1
 static void IN_BeginIgnoringMouseEvents(void){}
 static void IN_EndIgnoringMouseEvents(void){}
@@ -328,8 +332,8 @@ static void IN_UpdateGrabs_Internal(qboolean forecerelease)
 	qboolean needevents;	//whether we want to receive events still
 
 	qboolean gamecodecursor = (key_dest == key_game && cl.qcvm.cursorforced) || (key_dest == key_menu && cls.menu_qcvm.cursorforced);
-	wantcursor = ((key_dest == key_game && CL_IsActiveObserver()) || (key_dest == key_menu&&!bind_grab)) || gamecodecursor || !windowhasfocus; // woods no cursor needed in console
-	freemouse = wantcursor || gamecodecursor; // woods #mousemenu
+	wantcursor = ((key_dest == key_game && CL_IsActiveObserver() && !obs_cursor_hidden) || (key_dest == key_menu&&!bind_grab)) || gamecodecursor || !windowhasfocus; // woods no cursor needed in console
+	freemouse = wantcursor || gamecodecursor || (key_dest == key_game && CL_IsActiveObserver()); // woods #mousemenu - keep free mouse mode even when cursor is hidden
 	needevents = (!wantcursor) || key_dest == key_game;
 
 	if (isDedicated)
@@ -495,6 +499,9 @@ void IN_Init (void)
 		/* discard all mouse events when input is deactivated */
 		IN_BeginIgnoringMouseEvents();
 	}
+
+	obs_cursor_last_move = SDL_GetTicks(); // woods -- initialize observer cursor state #eyemouse
+	obs_cursor_hidden = false; // woods -- initialize observer cursor state #eyemouse
 
 #ifdef MACOS_X_ACCELERATION_HACK
 	Cvar_RegisterVariable(&in_disablemacosxmouseaccel);
@@ -1248,6 +1255,14 @@ static void IN_HandleObserverMouseEvents (SDL_Event* event) // woods #eyemouse
 			// Handle observer frags click
 			IN_ObsFragsClick(event->button.x, event->button.y);
 
+			// Update the cursor idle time on mouse click
+			obs_cursor_last_move = current_time;
+			if (obs_cursor_hidden) {
+				SDL_ShowCursor(SDL_ENABLE);
+				obs_cursor_hidden = false;
+				IN_UpdateGrabs(); // Refresh grabs to ensure cursor is visible
+			}
+
 			press_start_time = current_time;
 			is_long_pressing = true;
 			long_press_triggered = false;
@@ -1269,6 +1284,14 @@ static void IN_HandleObserverMouseEvents (SDL_Event* event) // woods #eyemouse
 
 		if (event->button.state == SDL_PRESSED)
 		{
+			// Update the cursor idle time on mouse click
+			obs_cursor_last_move = current_time;
+			if (obs_cursor_hidden) {
+				SDL_ShowCursor(SDL_ENABLE);
+				obs_cursor_hidden = false;
+				IN_UpdateGrabs(); // Refresh grabs to ensure cursor is visible
+			}
+
 			// Add cooldown to prevent accidental double-clicks (300ms)
 			if (current_time - last_flyme_time > COOL_DOWN_TIME)
 			{
@@ -1497,6 +1520,16 @@ void IN_SendKeyEvents (void)
 			{
 				IN_MouseMotion(event.motion.xrel, event.motion.yrel, event.motion.x, event.motion.y);
 			}
+			else if (key_dest == key_game && CL_IsActiveObserver()) // woods #eyemouse
+			{
+				// Update the cursor idle time on mouse movement in observer mode
+				obs_cursor_last_move = SDL_GetTicks();
+				if (obs_cursor_hidden) {
+					SDL_ShowCursor(SDL_ENABLE);
+					obs_cursor_hidden = false;
+					IN_UpdateGrabs(); // Refresh grabs to ensure cursor is visible
+				}
+			}
 			break;
 
 #if defined(USE_SDL2)
@@ -1557,6 +1590,27 @@ void IN_SendKeyEvents (void)
 		default:
 			break;
 		}
+	}
+
+	if (key_dest == key_game && CL_IsActiveObserver()) // woods -- observer cursor auto-hide #eyemouse
+	{
+		Uint32 now = SDL_GetTicks();
+		if (!obs_cursor_hidden && now - obs_cursor_last_move >= OBS_CURSOR_IDLE_MS)
+		{
+			IN_UpdateGrabs(); // Refresh grabs to ensure the mouse stays in free-mode
+			SDL_ShowCursor(SDL_DISABLE);
+			obs_cursor_hidden = true;
+			
+			
+		}
+	}
+	else if (obs_cursor_hidden && (!CL_IsActiveObserver() || key_dest != key_game))
+	{
+		// If we leave observer mode while cursor is hidden, reset state
+		IN_UpdateGrabs();
+		SDL_ShowCursor(SDL_ENABLE);
+		obs_cursor_hidden = false;
+		
 	}
 
 	static qboolean was_in_eyecam = false; // woods #eyemouse
