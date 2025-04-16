@@ -648,7 +648,6 @@ void R_BeginAliasOutlineRendering(aliasglsl_t* glsl)
 	// Enable depth testing and write to depth buffer
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
-	glDepthMask(GL_TRUE);
 
 	// Set uniforms for the main model pass (no outline)
 	GL_Uniform1fFunc(glsl->outlineWidthLoc, 0.0f); // No outline expansion
@@ -710,6 +709,7 @@ void R_DrawAliasModelOutline(aliasglsl_t* glsl, aliashdr_t* paliashdr, lerpdata_
 	glStencilMask(0x00); // Disable writing to the stencil buffer
 
 	// Disable depth writing to prevent depth buffer modifications
+	glDepthMask(GL_FALSE);
 	glDepthFunc(GL_LEQUAL);
 
 	glEnable(GL_BLEND);
