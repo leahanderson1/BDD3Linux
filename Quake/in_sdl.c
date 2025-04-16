@@ -1493,7 +1493,7 @@ void IN_SendKeyEvents (void)
 			{
 				M_Mousemove(event.button.x, event.button.y);
 			}
-			else if (!(key_dest == key_game && cl.modtype == 1 && cl.eyecam)) // woods #eyemouse
+			if (!(key_dest == key_game && cl.modtype == 1 && cl.eyecam)) // woods #eyemouse
 			{
 				IN_MouseMotion(event.motion.xrel, event.motion.yrel, event.motion.x, event.motion.y);
 			}
