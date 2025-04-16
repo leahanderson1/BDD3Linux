@@ -1588,6 +1588,11 @@ static void Draw_PowerupOverlays(int x, int y)
 	if (playernum < 0 || playernum >= MAX_SCOREBOARD)
 		return;
 
+	if (cl.modtype == 1 && cl.notobserver)
+		return;
+
+	if (cl.eyecam)
+	{
 	scoreboard_t* player = &cl.scores[playernum];
 
 	// Draw powerup overlays in order: ring (white), pent (red), quad (blue)
@@ -1600,6 +1605,7 @@ static void Draw_PowerupOverlays(int x, int y)
 	if (player->tinfo.quad_time > 0)
 		Draw_PowerupSegments(x, y, player->tinfo.quad_time, base_alpha, "0x0202cf");
 	}
+}
 
 /*
 ===============
@@ -1646,12 +1652,7 @@ void Sbar_DrawFace (void)
 		return;
 	}
 
-	if (cl.modtype == 1 && !cl.notobserver)  // if we ARE an observer
-	{
-		int playernum = cl.viewentity - 1;
-		if (playernum >= 0 && playernum < MAX_SCOREBOARD)
 			Draw_PowerupOverlays(112, 24);
-}
 }
 
 /*
@@ -2012,7 +2013,7 @@ void Sbar_Draw (void)
 			Sbar_DrawNum(198, 140, cl.stats[STAT_AMMO], 3,
 			cl.stats[STAT_AMMO] <= 10);
 	}
-	else // end qe hud, use traditional sbare
+	else // end qe hud, use traditional sbar
 	{
 		if (scr_viewsize.value < 120) //johnfitz -- check viewsize instead of sb_lines
 		{
