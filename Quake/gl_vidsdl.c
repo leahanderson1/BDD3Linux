@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // gl_vidsdl.c -- SDL GL vid component
 
 #include "quakedef.h"
+#include "q_ctype.h"
 #include "cfgfile.h"
 #include "bgmusic.h"
 #include "resource.h"
@@ -2055,6 +2056,7 @@ void VID_SyncCvars (void)
 //
 //==========================================================================
 
+extern qboolean	keydown[256]; // woods #modsmenu (iw)
 extern cvar_t host_maxfps;
 static char fps_string[16];
 
@@ -2461,6 +2463,55 @@ static void VID_MenuKey (int key)
 			S_LocalSound("misc/menu1.wav");
 			M_Menu_Options_f();
 			return;
+		}
+		else if (keydown[K_CTRL])
+		{
+			if ((key == 'u' || key == 'U') && videomenu.search.len > 0)
+			{
+				// Clear entire search with Ctrl+U
+				videomenu.search.len = 0;
+				videomenu.search.text[0] = 0;
+				numberOfVideoItems = VIDEO_OPTIONS_ITEMS;
+				return;
+		}
+			else if (key == K_BACKSPACE && videomenu.search.len > 0)
+			{
+				// Delete previous word - implementing M_DeletePrevWord logic directly
+				int pos = videomenu.search.len;
+
+				// 1. Skip trailing spaces
+				while (pos > 0 && q_isspace(videomenu.search.text[pos - 1]))
+					--pos;
+
+				// 2. Walk backwards until we hit a space
+				while (pos > 0 && !q_isspace(videomenu.search.text[pos - 1]))
+					--pos;
+
+				// 3. Shrink the string
+				videomenu.search.len = pos;
+				videomenu.search.text[pos] = '\0';
+
+				// Update filtering based on new search text
+				if (videomenu.search.len > 0)
+				{
+					numberOfVideoItems = 0;
+					for (int i = 0; i < VIDEO_OPTIONS_ITEMS; i++)
+					{
+						const char* itemtext = VID_Menu_GetItemText(i);
+						if (itemtext && q_strcasestr(itemtext, videomenu.search.text))
+						{
+							numberOfVideoItems++;
+							if (numberOfVideoItems == 1)
+								video_options_cursor = i;
+						}
+					}
+				}
+				else
+				{
+					numberOfVideoItems = VIDEO_OPTIONS_ITEMS;
+				}
+				return;
+			}
 		}
 		else if (key == K_BACKSPACE)
 		{

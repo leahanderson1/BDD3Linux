@@ -1193,6 +1193,23 @@ void M_List_Mousemove(menulist_t* list, int yrel)
 	//M_MouseSound("misc/menu1.wav");
 }
 
+void M_DeletePrevWord(listsearch_t* search)
+{
+	int pos = search->len;
+
+	/* 1.  skip any trailing spaces */
+	while (pos > 0 && q_isspace(search->text[pos - 1]))
+		--pos;
+
+	/* 2.  walk backwards until we hit the previous space */
+	while (pos > 0 && !q_isspace(search->text[pos - 1]))
+		--pos;
+
+	/* 3.  shrink the string */
+	search->len = pos;
+	search->text[pos] = '\0';
+}
+
 //=============================================================================
 
 int m_save_demonum;
@@ -2137,6 +2154,23 @@ void M_Maps_Key(int key)
 {
     int x, y;
 
+	if (keydown[K_CTRL])
+	{
+		if ((key == 'u' || key == 'U') && mapsmenu.list.search.len > 0)
+		{
+			mapsmenu.list.search.len = 0;
+			mapsmenu.list.search.text[0] = 0;
+			M_Maps_Refilter();
+			return;
+		}
+		else if (key == K_BACKSPACE && mapsmenu.list.search.len > 0)
+		{
+			M_DeletePrevWord(&mapsmenu.list.search);
+			M_Maps_Refilter();
+			return;
+		}
+	}
+	
     if (key >= 32 && key < 127) // Handle search input first, printable characters
     {
         if (mapsmenu.list.search.len < mapsmenu.list.search.maxlen)
@@ -2963,13 +2997,46 @@ void M_Setup_Key (int k)
 		if (setup_cursor == 0)
 		{
 			if (strlen(setup_hostname))
-				setup_hostname[strlen(setup_hostname)-1] = 0;
+			{
+				if (keydown[K_CTRL])
+				{
+					listsearch_t temp = { 0 };
+					temp.len = strlen(setup_hostname);
+					Q_strcpy(temp.text, setup_hostname);
+					M_DeletePrevWord(&temp);
+					Q_strcpy(setup_hostname, temp.text);
+		}
+				else
+					setup_hostname[strlen(setup_hostname) - 1] = 0;
+			}
 		}
 
 		if (setup_cursor == 1)
 		{
 			if (strlen(setup_myname))
-				setup_myname[strlen(setup_myname)-1] = 0;
+			{
+				if (keydown[K_CTRL])
+				{
+					listsearch_t temp = { 0 };
+					temp.len = strlen(setup_myname);
+					Q_strcpy(temp.text, setup_myname);
+					M_DeletePrevWord(&temp);
+					Q_strcpy(setup_myname, temp.text);
+		}
+				else
+					setup_myname[strlen(setup_myname) - 1] = 0;
+			}
+		}
+		break;
+
+	case 'u':
+	case 'U':
+		if (keydown[K_CTRL])
+		{
+			if (setup_cursor == 0)
+				setup_hostname[0] = 0;
+			else if (setup_cursor == 1)
+				setup_myname[0] = 0;
 		}
 		break;
 
@@ -3173,6 +3240,23 @@ void M_NameMaker_Key (int k)
 	case K_BACKSPACE:
 		if ((l = strlen(namemaker_name)))
 			namemaker_name[l - 1] = 0;
+
+		if (keydown[K_CTRL])
+		{
+			listsearch_t temp;
+			temp.len = strlen(namemaker_name);
+			Q_strcpy(temp.text, namemaker_name);
+			M_DeletePrevWord(&temp);
+			Q_strcpy(namemaker_name, temp.text);
+		}
+		break;
+
+	case 'u':
+	case 'U':
+		if (keydown[K_CTRL])
+		{
+			namemaker_name[0] = 0;
+		}
 		break;
 
 	// If we reached this point, we are simulating ENTER
@@ -4332,6 +4416,30 @@ void M_Keys_Key(int k)
 		return;
 	}
 
+	if (keydown[K_CTRL])
+	{
+		if ((k == 'u' || k == 'U') && keysmenu.search.len > 0)
+		{
+			// Clear entire search with Ctrl+U
+			keysmenu.search.len = 0;
+			keysmenu.search.text[0] = 0;
+			M_Keys_UpdateFilter();
+			return;
+		}
+		else if (k == K_BACKSPACE && keysmenu.search.len > 0)
+		{
+			// Delete previous word with Ctrl+Backspace
+			listsearch_t temp;
+			temp.len = keysmenu.search.len;
+			Q_strcpy(temp.text, keysmenu.search.text);
+			M_DeletePrevWord(&temp);
+			Q_strcpy(keysmenu.search.text, temp.text);
+			keysmenu.search.len = temp.len;
+			M_Keys_UpdateFilter();
+			return;
+		}
+	}
+
 	// Handle search functionality first
 	if (k >= 32 && k < 127) // Printable characters
 	{
@@ -4348,7 +4456,21 @@ void M_Keys_Key(int k)
 	{
 		if (keysmenu.search.len > 0)
 		{
+			if (keydown[K_CTRL])
+			{
+				// Delete previous word instead of just one character
+				listsearch_t temp;
+				temp.len = keysmenu.search.len;
+				Q_strcpy(temp.text, keysmenu.search.text);
+				M_DeletePrevWord(&temp);
+				Q_strcpy(keysmenu.search.text, temp.text);
+				keysmenu.search.len = temp.len;
+			}
+			else
+			{
+				// Delete one character
 			keysmenu.search.text[--keysmenu.search.len] = 0;
+			}
 			M_Keys_UpdateFilter();
 			return;
 		}
@@ -4687,7 +4809,23 @@ void M_Mouse_Key(int k)
 	{
 		if (mousemenu.search.len > 0)
 		{
+			if (keydown[K_CTRL])
+			{
+				// Delete previous word
+				listsearch_t temp;
+				temp.len = mousemenu.search.len;
+				Q_strcpy(temp.text, mousemenu.search.text);
+				M_DeletePrevWord(&temp);
+				Q_strcpy(mousemenu.search.text, temp.text);
+				mousemenu.search.len = temp.len;
+			}
+			else
+			{
+				// Delete one character
 			mousemenu.search.text[--mousemenu.search.len] = 0;
+			}
+
+			// Update filtering
 			if (mousemenu.search.len > 0)
 			{
 				numberOfMouseItems = 0;
@@ -4706,6 +4844,16 @@ void M_Mouse_Key(int k)
 			{
 				numberOfMouseItems = MOUSE_ITEMS;
 			}
+			return;
+		}
+	}
+	else if (k == 'u' || k == 'U')
+	{
+		if (keydown[K_CTRL] && mousemenu.search.len > 0)
+		{
+			mousemenu.search.len = 0;
+			mousemenu.search.text[0] = 0;
+			numberOfMouseItems = MOUSE_ITEMS;
 			return;
 		}
 	}
@@ -5327,6 +5475,48 @@ void M_Graphics_Key(int k)
 		M_Menu_Options_f();
 		return;
 	}
+	else if (keydown[K_CTRL])
+	{
+		if ((k == 'u' || k == 'U') && graphicsmenu.search.len > 0)
+		{
+			// Clear entire search with Ctrl+U
+			graphicsmenu.search.len = 0;
+			graphicsmenu.search.text[0] = 0;
+			numberOfGraphicsItems = GRAPHICS_ITEMS;
+			return;
+		}
+		else if (k == K_BACKSPACE && graphicsmenu.search.len > 0)
+		{
+			// Delete previous word with Ctrl+Backspace
+			listsearch_t temp;
+			temp.len = graphicsmenu.search.len;
+			Q_strcpy(temp.text, graphicsmenu.search.text);
+			M_DeletePrevWord(&temp);
+			Q_strcpy(graphicsmenu.search.text, temp.text);
+			graphicsmenu.search.len = temp.len;
+
+			// Update filtering based on new search text
+			if (graphicsmenu.search.len > 0)
+			{
+				numberOfGraphicsItems = 0;
+				for (int i = 0; i < GRAPHICS_ITEMS; i++)
+				{
+					const char* itemtext = M_Graphics_GetItemText(i);
+					if (itemtext && q_strcasestr(itemtext, graphicsmenu.search.text))
+					{
+						numberOfGraphicsItems++;
+						if (numberOfGraphicsItems == 1)
+							graphics_cursor = i;
+					}
+				}
+			}
+			else
+			{
+				numberOfGraphicsItems = GRAPHICS_ITEMS;
+			}
+			return;
+	}
+	}
 	else if (k == K_BACKSPACE)
 	{
 		if (graphicsmenu.search.len > 0)
@@ -5837,6 +6027,48 @@ void M_Sound_Key(int k)
 		}
 		M_Menu_Options_f();
 		return;
+	}
+	else if (keydown[K_CTRL])
+	{
+		if ((k == 'u' || k == 'U') && soundmenu.search.len > 0)
+		{
+			// Clear entire search with Ctrl+U
+			soundmenu.search.len = 0;
+			soundmenu.search.text[0] = 0;
+			numberOfSoundItems = SOUND_ITEMS;
+			return;
+		}
+		else if (k == K_BACKSPACE && soundmenu.search.len > 0)
+		{
+			// Delete previous word with Ctrl+Backspace
+			listsearch_t temp;
+			temp.len = soundmenu.search.len;
+			Q_strcpy(temp.text, soundmenu.search.text);
+			M_DeletePrevWord(&temp);
+			Q_strcpy(soundmenu.search.text, temp.text);
+			soundmenu.search.len = temp.len;
+
+			// Update filtering based on new search text
+			if (soundmenu.search.len > 0)
+			{
+				numberOfSoundItems = 0;
+				for (int i = 0; i < SOUND_ITEMS; i++)
+				{
+					const char* itemtext = M_Sound_GetItemText(i);
+					if (itemtext && q_strcasestr(itemtext, soundmenu.search.text))
+					{
+						numberOfSoundItems++;
+						if (numberOfSoundItems == 1)
+							sound_cursor = i;
+					}
+				}
+			}
+			else
+			{
+				numberOfSoundItems = SOUND_ITEMS;
+			}
+			return;
+		}
 	}
 	else if (k == K_BACKSPACE)
 	{
@@ -6596,6 +6828,48 @@ void M_Game_Key(int k)
 		M_Menu_Options_f();
 		return;
 	}
+	else if (keydown[K_CTRL])
+	{
+		if ((k == 'u' || k == 'U') && gamemenu.search.len > 0)
+		{
+			// Clear entire search with Ctrl+U
+			gamemenu.search.len = 0;
+			gamemenu.search.text[0] = 0;
+			numberOfGameItems = GAME_ITEMS;
+			return;
+		}
+		else if (k == K_BACKSPACE && gamemenu.search.len > 0)
+		{
+			// Delete previous word with Ctrl+Backspace
+			listsearch_t temp;
+			temp.len = gamemenu.search.len;
+			Q_strcpy(temp.text, gamemenu.search.text);
+			M_DeletePrevWord(&temp);
+			Q_strcpy(gamemenu.search.text, temp.text);
+			gamemenu.search.len = temp.len;
+
+			// Update filtering based on new search text
+			if (gamemenu.search.len > 0)
+			{
+				numberOfGameItems = 0;
+				for (int i = 0; i < GAME_ITEMS; i++)
+				{
+					const char* itemtext = M_Game_GetItemText(i);
+					if (itemtext && q_strcasestr(itemtext, gamemenu.search.text))
+					{
+						numberOfGameItems++;
+						if (numberOfGameItems == 1)
+							game_cursor = i;
+					}
+				}
+			}
+			else
+			{
+				numberOfGameItems = GAME_ITEMS;
+			}
+			return;
+	}
+	}
 	else if (k == K_BACKSPACE)
 	{
 		if (gamemenu.search.len > 0)
@@ -7180,6 +7454,48 @@ void M_HUD_Key(int k)
 		}
 		M_Menu_Options_f();
 		return;
+	}
+	else if (keydown[K_CTRL])
+	{
+		if ((k == 'u' || k == 'U') && hudmenu.search.len > 0)
+		{
+			// Clear entire search with Ctrl+U
+			hudmenu.search.len = 0;
+			hudmenu.search.text[0] = 0;
+			numberOfHUDItems = HUD_ITEMS;
+			return;
+		}
+		else if (k == K_BACKSPACE && hudmenu.search.len > 0)
+		{
+			// Delete previous word with Ctrl+Backspace
+			listsearch_t temp;
+			temp.len = hudmenu.search.len;
+			Q_strcpy(temp.text, hudmenu.search.text);
+			M_DeletePrevWord(&temp);
+			Q_strcpy(hudmenu.search.text, temp.text);
+			hudmenu.search.len = temp.len;
+
+			// Update filtering based on new search text
+			if (hudmenu.search.len > 0)
+			{
+				numberOfHUDItems = 0;
+				for (int i = 0; i < HUD_ITEMS; i++)
+				{
+					const char* itemtext = M_HUD_GetItemText(i);
+					if (itemtext && q_strcasestr(itemtext, hudmenu.search.text))
+					{
+						numberOfHUDItems++;
+						if (numberOfHUDItems == 1)
+							hud_cursor = i;
+					}
+				}
+			}
+			else
+			{
+				numberOfHUDItems = HUD_ITEMS;
+			}
+			return;
+		}
 	}
 	else if (k == K_BACKSPACE)
 	{
@@ -8293,6 +8609,48 @@ void M_Console_Key(int k)
 		M_Menu_Options_f();
 		return;
 	}
+	else if (keydown[K_CTRL])
+	{
+		if ((k == 'u' || k == 'U') && consolemenu.search.len > 0)
+		{
+			// Clear entire search with Ctrl+U
+			consolemenu.search.len = 0;
+			consolemenu.search.text[0] = 0;
+			numberOfConsoleItems = CONSOLE_ITEMS;
+			return;
+		}
+		else if (k == K_BACKSPACE && consolemenu.search.len > 0)
+		{
+			// Delete previous word with Ctrl+Backspace
+			listsearch_t temp;
+			temp.len = consolemenu.search.len;
+			Q_strcpy(temp.text, consolemenu.search.text);
+			M_DeletePrevWord(&temp);
+			Q_strcpy(consolemenu.search.text, temp.text);
+			consolemenu.search.len = temp.len;
+
+			// Update filtering based on new search text
+			if (consolemenu.search.len > 0)
+			{
+				numberOfConsoleItems = 0;
+				for (int i = 0; i < CONSOLE_ITEMS; i++)
+				{
+					const char* itemtext = M_Console_GetItemText(i);
+					if (itemtext && q_strcasestr(itemtext, consolemenu.search.text))
+					{
+						numberOfConsoleItems++;
+						if (numberOfConsoleItems == 1)
+							console_cursor = i;
+					}
+				}
+			}
+			else
+			{
+				numberOfConsoleItems = CONSOLE_ITEMS;
+			}
+			return;
+		}
+	}
 	else if (k == K_BACKSPACE)
 	{
 		if (consolemenu.search.len > 0)
@@ -8804,6 +9162,48 @@ void M_Extras_Key(int k)
 		}
 		M_Menu_Options_f();
 		return;
+	}
+	else if (keydown[K_CTRL])
+	{
+		if ((k == 'u' || k == 'U') && extrasmenu.search.len > 0)
+		{
+			// Clear entire search with Ctrl+U
+			extrasmenu.search.len = 0;
+			extrasmenu.search.text[0] = 0;
+			numberOfExtrasItems = EXTRAS_ITEMS;
+			return;
+		}
+		else if (k == K_BACKSPACE && extrasmenu.search.len > 0)
+		{
+			// Delete previous word with Ctrl+Backspace
+			listsearch_t temp;
+			temp.len = extrasmenu.search.len;
+			Q_strcpy(temp.text, extrasmenu.search.text);
+			M_DeletePrevWord(&temp);
+			Q_strcpy(extrasmenu.search.text, temp.text);
+			extrasmenu.search.len = temp.len;
+
+			// Update filtering based on new search text
+			if (extrasmenu.search.len > 0)
+			{
+				numberOfExtrasItems = 0;
+				for (int i = 0; i < EXTRAS_ITEMS; i++)
+				{
+					const char* itemtext = M_Extras_GetItemText(i);
+					if (itemtext && q_strcasestr(itemtext, extrasmenu.search.text))
+					{
+						numberOfExtrasItems++;
+						if (numberOfExtrasItems == 1)
+							extras_cursor = i;
+					}
+				}
+			}
+			else
+			{
+				numberOfExtrasItems = EXTRAS_ITEMS;
+			}
+			return;
+		}
 	}
 	else if (k == K_BACKSPACE)
 	{
@@ -9619,6 +10019,37 @@ void M_LanConfig_Key (int key)
 			if (strlen(lanConfig_joinname))
 				lanConfig_joinname[strlen(lanConfig_joinname)-1] = 0;
 		}
+
+		if (keydown[K_CTRL])
+		{
+			if (lanConfig_cursor == 0)
+			{
+				listsearch_t temp;
+				temp.len = strlen(lanConfig_portname);
+				Q_strcpy(temp.text, lanConfig_portname);
+				M_DeletePrevWord(&temp);
+				Q_strcpy(lanConfig_portname, temp.text);
+			}
+			else if (lanConfig_cursor == 5)
+			{
+				listsearch_t temp;
+				temp.len = strlen(lanConfig_joinname);
+				Q_strcpy(temp.text, lanConfig_joinname);
+				M_DeletePrevWord(&temp);
+				Q_strcpy(lanConfig_joinname, temp.text);
+			}
+		}
+		break;
+
+	case 'u':
+	case 'U':
+		if (keydown[K_CTRL])
+		{
+			if (lanConfig_cursor == 0)
+				lanConfig_portname[0] = 0;
+			else if (lanConfig_cursor == 5)
+				lanConfig_joinname[0] = 0;
+	}
 		break;
 	}
 
@@ -10405,6 +10836,37 @@ void M_Bookmarks_Edit_Key(int k)
 			if (strlen(temp_alias))
 				temp_alias[strlen(temp_alias) - 1] = 0;
 		}
+
+		if (keydown[K_CTRL])
+		{
+			if (bookmarks_edit_cursor == 0)
+			{
+				listsearch_t temp;
+				temp.len = strlen(temp_name);
+				Q_strcpy(temp.text, temp_name);
+				M_DeletePrevWord(&temp);
+				Q_strcpy(temp_name, temp.text);
+			}
+			else if (bookmarks_edit_cursor == 1)
+			{
+				listsearch_t temp;
+				temp.len = strlen(temp_alias);
+				Q_strcpy(temp.text, temp_alias);
+				M_DeletePrevWord(&temp);
+				Q_strcpy(temp_alias, temp.text);
+			}
+		}
+		break;
+
+	case 'u':
+	case 'U':
+		if (keydown[K_CTRL])
+		{
+			if (bookmarks_edit_cursor == 0)
+				temp_name[0] = 0;
+			else if (bookmarks_edit_cursor == 1)
+				temp_alias[0] = 0;
+	}
 		break;
 	}
 }
@@ -12325,6 +12787,24 @@ void M_Demos_Key(int key)
 {
     int x, y; // woods #mousemenu
 
+	// Handle Ctrl+U or Ctrl+Backspace first
+	if (keydown[K_CTRL])
+	{
+		if ((key == 'u' || key == 'U') && demosmenu.list.search.len > 0)
+		{
+			demosmenu.list.search.len = 0;
+			demosmenu.list.search.text[0] = 0;
+			M_Demos_Refilter();
+			return;
+		}
+		else if (key == K_BACKSPACE && demosmenu.list.search.len > 0)
+		{
+			M_DeletePrevWord(&demosmenu.list.search);
+			M_Demos_Refilter();
+			return;
+		}
+	}
+	
     if (key >= 32 && key < 127) // Handle search input first, printable characters
     {
         if (demosmenu.list.search.len < demosmenu.list.search.maxlen)
