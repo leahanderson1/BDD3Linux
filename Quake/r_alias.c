@@ -815,6 +815,17 @@ void R_DrawViewmodelShell(aliasglsl_t* glsl, aliashdr_t* paliashdr, lerpdata_t* 
 
 	float shellColor[4] = { 0.0f, 0.0f, 0.0f, shellAlpha };
 
+	if (cl.time <= cl.faceanimtime && cl_damagehue.value)
+	{
+		plcolour_t dhvalue = CL_PLColours_Parse(cl_damagehuecolor.string);
+		byte* dhuecolor = CL_PLColours_ToRGB(&dhvalue);
+		
+		shellColor[0] = dhuecolor[0] / 255.0f;
+		shellColor[1] = dhuecolor[1] / 255.0f;
+		shellColor[2] = dhuecolor[2] / 255.0f;
+	}
+	else
+	{
 	if ((cl.items & IT_QUAD) && (cl.items & IT_INVULNERABILITY))
 	{
 		shellColor[0] = 1.0f;  // Red
@@ -824,6 +835,7 @@ void R_DrawViewmodelShell(aliasglsl_t* glsl, aliashdr_t* paliashdr, lerpdata_t* 
 		shellColor[2] = 1.0f;  // Blue
 	else if (cl.items & IT_INVULNERABILITY)
 		shellColor[0] = 1.0f;  // Red
+	}
 
 	GL_Uniform1iFunc(glsl->shellModeLoc, 2);
 	GL_Uniform1iFunc(glsl->isOutlinePassLoc, 2);
@@ -857,7 +869,26 @@ static void R_ApplyPowerupShellEffect(aliasglsl_t* glsl, entity_t* e) // -- wood
 {
 	GL_Uniform1iFunc(glsl->useShellTexLoc, 0);
 
-	if (!(cl.time <= cl.faceanimtime && cl_damagehue.value))
+	if (cl.time <= cl.faceanimtime && cl_damagehue.value)
+	{
+		if (cl.gametype == GAME_DEATHMATCH && e == &cl.viewent && !chase_active.value)
+		{
+			if (r_coloredpowerupglow.value && gl_powerupshells.value <= 1)
+			{
+				float shellAlpha = 1.0f * CLAMP(0, gl_powerupshells.value, 1);
+				plcolour_t dhvalue = CL_PLColours_Parse(cl_damagehuecolor.string);
+				byte* dhuecolor = CL_PLColours_ToRGB(&dhvalue);
+				
+				// apply darker damage hue color to the shell
+				float red = dhuecolor[0] / 255.0f * 0.7f;
+				float green = dhuecolor[1] / 255.0f * 0.7f;
+				float blue = dhuecolor[2] / 255.0f * 0.7f;
+				
+				ApplyShellEffect(glsl, red, green, blue, cl.time, shellAlpha);
+			}
+		}
+	}
+	else
 	{
 		if (cl.gametype == GAME_DEATHMATCH && e == &cl.viewent && !chase_active.value)
 		{
