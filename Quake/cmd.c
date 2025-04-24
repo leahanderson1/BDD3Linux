@@ -620,6 +620,11 @@ Writes all non-server aliases to a file as:
 #define MAX_ALIASES 1024
 #define MAX_ALIAS_VALUE 1024
 
+static qboolean Alias_NameCollides(const char* name)
+{
+	return (Cmd_Exists(name) || Cvar_FindVar(name));
+}
+
 qboolean IsServerAlias(const char* name, server_alias_t* server_aliases) 
 {
 	server_alias_t* sa;
@@ -673,6 +678,8 @@ void Alias_WriteAliases(FILE* f)
 			if (IsServerAlias(alias->name, server_aliases)) {
 				continue; // Skip server aliases
 			}
+			if (cfg_save_aliases.value == 1 && Alias_NameCollides(alias->name))
+				continue;
 			if (alias->name[0] == '+') {
 				if (plus_count < MAX_ALIASES) {
 					plus_aliases[plus_count++] = alias;
