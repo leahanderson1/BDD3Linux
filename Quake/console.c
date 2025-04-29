@@ -546,8 +546,13 @@ static qboolean Con_ProcessPlayerMessage(const char* txt) // woods #like
 				src += 2; // Skip color code
 				continue;
 			}
-			*dst++ = *src++;
-			len++;
+			
+			if ((unsigned char)*src >= 32) // Only copy printable characters
+			{
+				*dst++ = *src;
+				len++;
+			}
+			src++;
 		}
 		*dst = '\0';
 
