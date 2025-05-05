@@ -226,6 +226,7 @@ extern PFNGLUNMAPBUFFERARBPROC	GL_UnmapBufferFunc;
 extern	qboolean	gl_vbo_able;
 //ericw
 
+extern gltexture_t* underwatertexture; // woods #caustics
 extern gltexture_t* shelltexture; // woods #powershell
 
 extern PFNGLMAPBUFFERRANGEPROC	GL_MapBufferRangeFunc;
@@ -258,6 +259,7 @@ typedef void (APIENTRYP QS_PFNGLUNIFORM1FPROC) (GLint location, GLfloat v0);
 typedef void (APIENTRYP QS_PFNGLUNIFORM3FPROC) (GLint location, GLfloat v0, GLfloat v1, GLfloat v2);
 typedef void (APIENTRYP QS_PFNGLUNIFORM4FPROC) (GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3);
 typedef void (APIENTRYP QS_PFNGLUNIFORM4FVPROC) (GLint location, GLsizei count, const GLfloat *value);
+typedef void (APIENTRYP QS_PFNGLUNIFORM1IVPROC) (GLint location, GLsizei count, const GLint* value); // woods #caustics
 typedef void (APIENTRYP QS_PFNGENERATEMIPMAP) (GLenum type);
 
 extern QS_PFNGLCREATESHADERPROC GL_CreateShaderFunc;
@@ -284,6 +286,7 @@ extern QS_PFNGLUNIFORM1FPROC GL_Uniform1fFunc;
 extern QS_PFNGLUNIFORM3FPROC GL_Uniform3fFunc;
 extern QS_PFNGLUNIFORM4FPROC GL_Uniform4fFunc;
 extern QS_PFNGLUNIFORM4FVPROC GL_Uniform4fvFunc;
+extern QS_PFNGLUNIFORM1IVPROC GL_Uniform1ivFunc; // woods #caustics
 extern	qboolean	gl_glsl_able;
 extern	qboolean	gl_glsl_gamma_able;
 extern	qboolean	gl_glsl_alias_able;
