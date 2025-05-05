@@ -945,6 +945,32 @@ static part_type_t *P_GetParticleType(const char *config, const char *name) // w
 	/* ---------- 3.  Grow the array ---------- */
 	part_type_t* old_base = part_type;
 	size_t       old_count = numparticletypes;
+	ptrdiff_t    run_list_offset = -1;
+	ptrdiff_t*   next_offsets = NULL;
+
+	/* Pre-calculate offsets before realloc invalidates old_base */
+	if (old_count > 0)
+	{
+		/* Offset for global run-list */
+		if (part_run_list >= old_base && part_run_list < old_base + old_count)
+			run_list_offset = part_run_list - old_base;
+
+		/* Allocate storage for nexttorun offsets */
+		next_offsets = malloc(sizeof(ptrdiff_t) * old_count);
+		if (!next_offsets)
+			Sys_Error("P_GetParticleType: out of memory (malloc for offsets failed)");
+
+		/* Offsets for nexttorun pointers */
+		for (size_t idx = 0; idx < old_count; ++idx) {
+			part_type_t* pt_fix = &old_base[idx]; /* Use old_base here! */
+			if (pt_fix->nexttorun >= old_base &&
+				pt_fix->nexttorun < old_base + old_count)
+				next_offsets[idx] = pt_fix->nexttorun - old_base;
+			else
+				next_offsets[idx] = -1; /* Mark as NULL or out-of-bounds */
+		}
+	}
+
 
 	part_type = Z_Realloc(part_type, sizeof(part_type_t) * (old_count + 1));
 	if (!part_type)
@@ -960,22 +986,29 @@ static part_type_t *P_GetParticleType(const char *config, const char *name) // w
 	pt_new->emit = P_INVALID;
 	pt_new->loaded = 0;
 
-	/* ---------- 4.  Pointer fix-ups if the block moved ---------- */
-	if (old_count > 0 && old_base != part_type)
+	/* ---------- 4.  Pointer fix-ups & slooks ---------- */
+	if (old_count > 0)
 	{
-		/* 4a. global run-list */
-		if (part_run_list >= old_base && part_run_list < old_base + old_count)
-			part_run_list = part_type + (part_run_list - old_base);
+		/* 4a/4b. Fix pointers using offsets if the block moved */
+		if (old_base != part_type)
+		{
+			/* global run-list */
+			if (run_list_offset != -1)
+				part_run_list = part_type + run_list_offset;
+			/* else: part_run_list was NULL or outside, remains unchanged */
 
-		/* 4b. nexttorun pointers */
-		for (size_t idx = 0; idx < old_count; ++idx) {
-			part_type_t* pt_fix = &part_type[idx];
-			if (pt_fix->nexttorun >= old_base &&
-				pt_fix->nexttorun < old_base + old_count)
-				pt_fix->nexttorun = part_type + (pt_fix->nexttorun - old_base);
+			/* nexttorun pointers */
+			for (size_t idx = 0; idx < old_count; ++idx) {
+				if (next_offsets[idx] != -1)
+					part_type[idx].nexttorun = part_type + next_offsets[idx];
+				else
+					part_type[idx].nexttorun = NULL; /* Ensure NULL if it was */
+			}
 		}
+		/* else: block didn't move, pointers are still valid */
 
-		/* 4c. rebuild all slooks sharing */
+		/* 4c. rebuild all slooks sharing (runs whether block moved or not) */
+		/* Note: loop goes up to new numparticletypes to include pt_new */
 		for (size_t n = 0; n < numparticletypes; ++n) {
 			plooks_t* share = NULL;
 			for (size_t j = 0; j < n; ++j)
@@ -984,11 +1017,18 @@ static part_type_t *P_GetParticleType(const char *config, const char *name) // w
 					share = part_type[j].slooks;
 					break;
 				}
+			/* If shared, point to existing slooks, otherwise point to own looks */
 			part_type[n].slooks = share ? share : &part_type[n].looks;
 		}
 	}
-	else
-		pt_new->slooks = &pt_new->looks;   /* first allocation or no move */
+	else /* old_count == 0 */
+	{
+		pt_new->slooks = &pt_new->looks;   /* first allocation */
+	}
+
+	/* Free the temporary offset storage */
+	if (next_offsets)
+		free(next_offsets);
 
 	/* ---------- 5.  Final init & housekeeping ---------- */
 	pt_new->particles = NULL;
