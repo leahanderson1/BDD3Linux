@@ -4427,6 +4427,7 @@ int SCR_ModalMessage (const char *text, float timeout) //johnfitz -- timeout
 		if (timeout) time2 = Sys_DoubleTime (); //johnfitz -- zero timeout means wait forever.
 	} while (lastchar != 'y' && lastchar != 'Y' &&
 		 lastchar != 'n' && lastchar != 'N' &&
+		 lastchar != '`' &&
 		 lastkey != K_ESCAPE &&
 		 lastkey != K_ABUTTON &&
 		 lastkey != K_BBUTTON &&
