@@ -155,6 +155,7 @@ cvar_t		gl_triplebuffer = {"gl_triplebuffer", "1", CVAR_ARCHIVE};
 
 cvar_t		cl_gun_fovscale = {"cl_gun_fovscale","1",CVAR_ARCHIVE}; // Qrack
 cvar_t		cl_menucrosshair = { "cl_menucrosshair","0",CVAR_ARCHIVE}; // woods #menucrosshair
+cvar_t		cl_pong = {"cl_pong","2",CVAR_ARCHIVE}; // woods #pong -- 0 = disabled, >0 = enabled with speed multiplier
 
 extern	cvar_t	crosshair;
 extern	cvar_t	con_notifyfade; // woods #confade
@@ -1008,6 +1009,7 @@ void SCR_Init (void)
 	Cvar_RegisterVariable (&gl_triplebuffer);
 	Cvar_RegisterVariable (&cl_gun_fovscale);
 	Cvar_RegisterVariable (&cl_menucrosshair); // woods #menucrosshair
+	Cvar_RegisterVariable (&cl_pong); // woods #pong
 
 	Cmd_AddCommand ("screenshot",SCR_ScreenShot_f);
 	Cmd_AddCommand ("sizeup",SCR_SizeUp_f);
@@ -1023,6 +1025,7 @@ void SCR_Init (void)
 	scr_initialized = true;
 
 	LoadCustomCursorImage (); // woods #customcursor
+	Pong_Init (); // woods #pong
 }
 
 //============================================================================
@@ -4446,6 +4449,397 @@ int SCR_ModalMessage (const char *text, float timeout) //johnfitz -- timeout
 	return (lastchar == 'y' || lastchar == 'Y' || lastkey == K_ABUTTON);
 }
 
+/*
+=================
+Pong -- woods #pong
+=================
+
+A simple Pong mini-game that runs whenever the game is paused (#pong).
+Controlled by the cl_pong cvar, it features resolution-independent scaling,
+an adjustable speed multiplier, basic AI paddle logic, and standard
+Quake engine rendering and input handling for a retro diversion.
+*/
+
+extern cvar_t gl_load24bit;
+extern qpic_t* sb_nums[2][11];
+extern qboolean windowhasfocus;
+
+#define BASE_W          1920.0f
+#define BASE_H          1080.0f
+#define MAX_BALL_SPEED  900.f
+#define AI_OFFSET_TIME  0.25f
+
+static inline float GetScale(void)
+{
+	float sx = (float)glwidth / BASE_W;
+	float sy = (float)glheight / BASE_H;
+	return q_min(sx, sy);
+}
+static inline float Clamp(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+typedef struct { float x, y, w, h, speed; } paddle_t;
+typedef struct {
+	float x, y, size, dx, dy, speed;
+	qmodel_t* model;
+	struct gltexture_s* texture;
+	mspriteframe_t* frame;
+} ball_t;
+
+static paddle_t player, ai;
+static ball_t   ball;
+static int      scr_w, scr_h;
+static int      paddle_w = 15, paddle_h = 80, ball_sz = 10;
+static int      ply_score = 0, ai_score = 0;
+static float pong_last_maptime_init = 0; // Store maptime when pong last init'd
+static qpic_t* pong_pause_pic = NULL; // Cache the pause picture pointer
+
+
+static qboolean game_init = false;
+static qboolean sprite_checked = false;
+
+static float    last_upd_time = 0;
+static float    player_paddle_flash_time = 0.0f; // Time when the flash should end
+
+void Pong_Init(void)
+{
+	memset(&ball, 0, sizeof(ball));
+	sprite_checked = false;
+
+	// Cache pause pic on init
+	if (!pong_pause_pic)
+		pong_pause_pic = Draw_CachePic("gfx/pause.lmp");
+}
+
+static void Pong_Reset(void)
+{
+	const float sc = GetScale();
+	scr_w = vid.width;  scr_h = vid.height;
+
+	player.w = ai.w = paddle_w;
+	player.h = ai.h = paddle_h;
+	ball.size = ball_sz;
+
+	if (!game_init) {
+		int mx, my; SDL_GetMouseState(&mx, &my);
+		player.y = Clamp((float)my / sc - player.h * 0.5f, 0, (scr_h / sc) - player.h);
+		player.x = (scr_w / sc) - paddle_w - 20;
+		player.speed = 500.f;
+		ply_score = ai_score = 0; // Reset score only on first init
+	}
+	else {
+		player.x = (scr_w / sc) - paddle_w - 20;
+		player.y = Clamp(player.y, 0, (scr_h / sc) - player.h);
+	}
+
+	ai.x = 20; ai.y = ((scr_h / sc) - paddle_h) * 0.5f; ai.speed = 300.f;
+
+	if (!pong_pause_pic) // Use cached pause pic
+	{
+		pong_pause_pic = Draw_CachePic("gfx/pause.lmp"); // Attempt to cache again if init failed
+		if (!pong_pause_pic) return; // Cannot proceed without pause pic
+	}
+	float msc = Clamp(q_min((float)glwidth / 320.f, (float)glheight / 200.f),
+		1.f, scr_menuscale.value);
+	float top = (((240 - 48 - pong_pause_pic->height) / 2) * msc + (glheight - 200 * msc) / 2) / sc;
+
+	ball.x = (scr_w / sc) * 0.5f;
+	ball.y = Clamp(top - ball.size * 8, ball.size * 4, (scr_h / sc) * 0.25f);
+	float ang = ((rand() % 60) - 30) * (M_PI / 180.f);
+	float dir = (rand() % 2) ? 1.f : -1.f;
+	ball.dx = dir * cosf(ang); ball.dy = sinf(ang);
+	float m = sqrtf(ball.dx * ball.dx + ball.dy * ball.dy);
+	ball.dx /= m; ball.dy /= m;
+	// Use pong_enable value as speed multiplier (will be 0 if disabled)
+	ball.speed = 300.f * cl_pong.value;
+
+	game_init = true;
+	last_upd_time = realtime;
+}
+
+static inline void Pong_HandlePaddleCollision(paddle_t* P)
+{
+	if (ball.x + ball.size * 0.5f > P->x && ball.x - ball.size * 0.5f < P->x + P->w &&
+		ball.y + ball.size * 0.5f > P->y && ball.y - ball.size * 0.5f < P->y + P->h)
+	{
+		ball.x = (ball.dx > 0 ? P->x - ball.size * 0.5f : P->x + P->w + ball.size * 0.5f);
+		ball.dx = -ball.dx;
+		S_LocalSound("buttons/switch21.wav");
+		float rel = (P->y + P->h * 0.5f) - ball.y;
+		ball.dy = -0.75f * (rel / (P->h * 0.5f));
+		if (fabsf(ball.dy) < 0.1f) ball.dy = (ball.dy > 0 ? 0.1f : -0.1f);
+		float m = sqrtf(ball.dx * ball.dx + ball.dy * ball.dy);
+		if (m != 0) { // Avoid division by zero
+			ball.dx /= m;
+			ball.dy /= m;
+		}
+		ball.speed = q_min(ball.speed * 1.05f, MAX_BALL_SPEED);
+	}
+}
+
+void Pong_Update(void)
+{
+	if (cl_pong.value <= 0 || (!cl.paused && !cl.match_pause_time) || cls.demoplayback) return;
+
+	if (game_init && (vid.width != scr_w || vid.height != scr_h)) // Check if the window was resized while paused
+	{
+		Pong_Reset(); // Re-initialize with new dimensions
+	}
+
+	if (maptime > pong_last_maptime_init) // Check if the map has changed since the last time Pong was active
+	{
+		game_init = false;      // Force re-initialization
+		sprite_checked = false; // Force sprite lookup
+		ball.model = NULL;      // Clear potentially stale pointers
+		ball.frame = NULL;
+		ball.texture = NULL;
+		pong_last_maptime_init = maptime; // Update our stored maptime
+	}
+
+	qboolean frozen = (key_dest != key_game || !windowhasfocus); // Check if the game logic should be frozen
+
+	// Initialize the game on the first *active* frame if needed
+	// We also need last_upd_time to be set correctly before calculating dt
+	if (!game_init) {
+		if (!frozen) {
+			Pong_Reset(); // This sets game_init and last_upd_time
+		}
+		else {
+			return; // Don't initialize or update if frozen
+		}
+	}
+
+	// If frozen, do not update game state or last_upd_time
+	if (frozen) {
+		return;
+	}
+
+	// --- Game logic proceeds only if not frozen ---
+
+	const float sc = GetScale();
+	const float sw = scr_w / sc, sh = scr_h / sc;
+
+	// Calculate dt based on last *active* update time
+	float dt = realtime - last_upd_time;
+	// Update last_upd_time *only when* logic runs
+	last_upd_time = realtime;
+
+	// Handle potential time issues (e.g., after regaining focus if dt wasn't clamped)
+	if (dt < 0) dt = 0; // Prevent issues if time goes backwards slightly
+	// Clamp large delta time - might still happen if focus is lost/regained rapidly
+	// between the frozen check and here, though unlikely. A clamp is safe.
+	if (dt > 0.1f) dt = 0.1f;
+
+	/* move ball --------------------------------------------------------- */
+	ball.x += ball.dx * ball.speed * dt;
+	ball.y += ball.dy * ball.speed * dt;
+	if (ball.y - ball.size * 0.5f < 0) { ball.y = ball.size * 0.5f; ball.dy = -ball.dy; }
+	if (ball.y + ball.size * 0.5f > sh) { ball.y = sh - ball.size * 0.5f;ball.dy = -ball.dy; }
+
+	/* bounce off pause pic --------------------------------------------- */
+	// Use cached pause pic
+	if (!pong_pause_pic) return; // Cannot bounce if pic not loaded
+	float msc = Clamp(q_min((float)glwidth / 320.f, (float)glheight / 200.f),
+		1.f, scr_menuscale.value);
+	float px = ((320 - pong_pause_pic->width) / 2) * msc + (glwidth - 320 * msc) / 2;
+	float py = ((240 - 48 - pong_pause_pic->height) / 2) * msc + (glheight - 200 * msc) / 2;
+	float pw = pong_pause_pic->width * msc, ph = pong_pause_pic->height * msc;
+	px /= sc; py /= sc; pw /= sc; ph /= sc;
+	if (ball.x + ball.size * 0.5f > px && ball.x - ball.size * 0.5f < px + pw &&
+		ball.y + ball.size * 0.5f > py && ball.y - ball.size * 0.5f < py + ph)
+	{
+		float d[4] = { ball.x - px,(px + pw) - ball.x,ball.y - py,(py + ph) - ball.y };
+		int s = 0; for (int i = 1;i < 4;i++)if (d[i] < d[s])s = i;
+		if (s == 0) { ball.x = px - ball.size * 0.5f;ball.dx = -fabsf(ball.dx); }
+		if (s == 1) { ball.x = px + pw + ball.size * 0.5f;ball.dx = fabsf(ball.dx); }
+		if (s == 2) { ball.y = py - ball.size * 0.5f;ball.dy = -fabsf(ball.dy); }
+		if (s == 3) { ball.y = py + ph + ball.size * 0.5f;ball.dy = fabsf(ball.dy); }
+	}
+
+	/* paddle collision macro ------------------------------------------- */
+	if (ball.dx > 0) { Pong_HandlePaddleCollision(&player); }
+	else { Pong_HandlePaddleCollision(&ai); }
+
+	/* AI movement -------------------------------------------------------- */
+	// AI uses dt, so it freezes automatically when update logic stops
+	static float offset = 0, last_off = 0; // Keep these static within the function
+	static qboolean ball_right = true;     // Keep this static
+
+	qboolean ball_left = ball.x < sw * 0.5f;
+	if (ball.dx < 0 && (ball_right || realtime - last_off > AI_OFFSET_TIME)) {
+		float diff = ai_score - ply_score;
+		float t = Clamp(fabsf(diff) / 5.f, 0, 1);
+		float eff = (diff <= 0) ? (0.6f + 0.15f * t) : (0.6f - 0.35f * t);
+		// Calculate offset relative to scaled paddle height
+		float random_fraction = (rand() / (float)RAND_MAX) * 2.0f - 1.0f; // Random float between -1 and +1
+		float max_offset = ai.h * 0.5f * sc; // Max offset is half the paddle height (using ai.h which is already scaled)
+		offset = (1.f - eff) * random_fraction * max_offset; // Apply effectiveness factor
+		last_off = realtime;
+	}
+	ball_right = !ball_left; // Update ball_right state
+
+	float ai_tgt = ball.y - ai.h * 0.5f + offset;
+	if (ball.dx < 0) { // Only move AI paddle if ball is coming towards it
+		if (ai.y < ai_tgt) { ai.y += ai.speed * dt;if (ai.y > ai_tgt)ai.y = ai_tgt; }
+		else if (ai.y > ai_tgt) { ai.y -= ai.speed * dt;if (ai.y < ai_tgt)ai.y = ai_tgt; }
+	}
+	ai.y = Clamp(ai.y, 0, sh - ai.h);
+	// Player paddle position is updated by Pong_MouseMove
+
+	/* scoring ------------------------------------------------------------ */
+	if (ball.x < 0) { ++ply_score;S_LocalSound("zombie/z_miss.wav");Pong_Reset(); }
+	else if (ball.x > sw) {
+		++ai_score;S_LocalSound("zombie/z_miss.wav");
+		player_paddle_flash_time = realtime + 0.1f;
+		Pong_Reset();
+	}
+}
+
+static void Quad(float x, float y, float w, float h)
+{
+	glBegin(GL_QUADS);
+	glVertex2f(x, y); glVertex2f(x + w, y); glVertex2f(x + w, y + h); glVertex2f(x, y + h);
+	glEnd();
+}
+
+void Pong_Draw(void)
+{
+	// Skip drawing during demo playback
+	if (cls.demoplayback) return;
+
+	// Only draw if enabled and game is paused
+	if (cl_pong.value <= 0 || (!cl.paused && !cl.match_pause_time)) return;
+
+	GL_SetCanvas(CANVAS_DEFAULT);
+
+	// Ensure game is initialized before drawing. Call Pong_Reset if needed.
+	// This handles the case where Draw runs before Update initializes the game.
+	if (!game_init) {
+		Pong_Reset();
+		// If Pong_Reset failed (e.g. sprite not loaded yet), game_init might still be false.
+		if (!game_init) return;
+	}
+
+	if (!sprite_checked) {
+		if (!ball.model || !ball.frame || !ball.texture ||
+			!ball.frame->gltexture ||
+			strcmp(ball.texture->name, "progs/s_light.spr:frame0"))
+		{
+			ball.model = Mod_ForName("progs/s_light.spr", false);
+			if (ball.model && ball.model->type == mod_sprite) {
+				msprite_t* sp = (msprite_t*)ball.model->cache.data;
+				if (sp && sp->numframes && sp->frames[0].type == SPR_SINGLE) {
+					ball.frame = sp->frames[0].frameptr;
+					ball.texture = ball.frame->gltexture;
+				}
+			}
+		}
+		else ball.texture = ball.frame->gltexture;
+		sprite_checked = true;
+	}
+	if (!ball.texture) return;
+
+	const float sc = GetScale();
+
+	/* scores ----------------------------------------------------------- */
+	// Use cached pause pic
+	if (!pong_pause_pic) return; // Cannot draw scores relative to pause pic if not loaded
+	float msc = Clamp(q_min((float)glwidth / 320.f, (float)glheight / 200.f),
+		1.f, scr_menuscale.value);
+	int px320 = (320 - pong_pause_pic->width) / 2, py320 = (240 - 48 - pong_pause_pic->height) / 2;
+	int psx = px320 * msc + (glwidth - 320 * msc) / 2,
+		psy = py320 * msc + (glheight - 200 * msc) / 2,
+		pw = pong_pause_pic->width * msc, ph = pong_pause_pic->height * msc;
+
+	glEnable(GL_TEXTURE_2D); glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Set standard blend func
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE); // Use modulate for scores/pics
+	glColor4f(1, 1, 1, 0.9f);
+
+	float num_sc = sc * 1.2f;
+	int sy = psy + (ph - 24 * num_sc) / 2, pad = 20 * sc,
+		x = psx - pad - (ai_score >= 10 ? 2 : 1) * 24 * num_sc;
+
+	if (ai_score >= 10) { Draw_ScaledPicAlpha(x, sy, sb_nums[0][ai_score / 10], num_sc, 1);x += 24 * num_sc; }
+	Draw_ScaledPicAlpha(x, sy, sb_nums[0][ai_score % 10], num_sc, 1);
+
+	x = psx + pw + pad;
+	if (ply_score >= 10) { Draw_ScaledPicAlpha(x, sy, sb_nums[0][ply_score / 10], num_sc, 1);x += 24 * num_sc; }
+	Draw_ScaledPicAlpha(x, sy, sb_nums[0][ply_score % 10], num_sc, 1);
+	glDisable(GL_TEXTURE_2D); // Disable texture for paddles (solid color quads)
+
+	/* paddles ----------------------------------------------------------- */
+	float pwid = paddle_w * sc, phgt = paddle_h * sc;
+	glColor4f(0, 0, 0, 0.9f); // Black outline
+	Quad(player.x * sc - sc, player.y * sc - sc, pwid + 2 * sc, phgt + 2 * sc);
+	Quad(ai.x * sc - sc, ai.y * sc - sc, pwid + 2 * sc, phgt + 2 * sc);
+
+	// Determine player paddle color (flash or default)
+	byte paddle_rgb[3];
+	float paddle_alpha = 0.9f; // Default alpha
+	static byte white_rgb[3] = { 255, 255, 255 };
+	byte* default_col = (cl.viewentity > 0 && (unsigned)(cl.viewentity - 1) < (unsigned)cl.maxclients) ?
+		CL_PLColours_ToRGB(&cl.scores[cl.viewentity - 1].pants) :
+		white_rgb;
+	paddle_rgb[0] = default_col[0];
+	paddle_rgb[1] = default_col[1];
+	paddle_rgb[2] = default_col[2];
+
+	// Draw the base player paddle
+	glColor4f(paddle_rgb[0] / 255.f, paddle_rgb[1] / 255.f, paddle_rgb[2] / 255.f, paddle_alpha);
+	Quad(player.x * sc, player.y * sc, pwid, phgt);
+
+	// Overlay damage color if flashing
+	if (cl_damagehue.value != 0 && realtime < player_paddle_flash_time)
+	{
+		// Use damage hue color
+		plcolour_t damage_color = CL_PLColours_Parse(cl_damagehuecolor.string);
+		paddle_rgb[0] = damage_color.rgb[0];
+		paddle_rgb[1] = damage_color.rgb[1];
+		paddle_rgb[2] = damage_color.rgb[2];
+		float flash_alpha = 0.7f; // Opacity for the flash overlay
+
+		// Draw the flash overlay
+		glColor4f(paddle_rgb[0] / 255.f, paddle_rgb[1] / 255.f, paddle_rgb[2] / 255.f, flash_alpha);
+		Quad(player.x * sc, player.y * sc, pwid, phgt);
+	}
+	// No 'else' needed, base paddle is already drawn
+
+	glColor4f(0.5f, 0.5f, 0.5f, 0.9f); // AI paddle color
+	Quad(ai.x * sc, ai.y * sc, pwid, phgt);
+
+	/* ball -------------------------------------------------------------- */
+	GL_DisableMultitexture(); // Ensure multitexture is off
+	GL_ClearBindings(); // Clear previous texture bindings
+	glEnable(GL_TEXTURE_2D); // Enable texture for ball sprite
+	glEnable(GL_ALPHA_TEST); glAlphaFunc(GL_GREATER, 0.1f); // Use alpha test for sprite transparency
+	GL_Bind(ball.texture); glColor4f(1, 1, 1, 0.9f); // White color for sprite
+
+	float bs = ball.size * sc * 1.5f,
+		smax = ball.frame ? ball.frame->smax : 1.f,
+		tmax = ball.frame ? ball.frame->tmax : 1.f;
+	glBegin(GL_QUADS);
+	glTexCoord2f(0, 0);        glVertex2f(ball.x * sc - bs, ball.y * sc + bs);
+	glTexCoord2f(smax, 0);     glVertex2f(ball.x * sc + bs, ball.y * sc + bs);
+	glTexCoord2f(smax, tmax);  glVertex2f(ball.x * sc + bs, ball.y * sc - bs);
+	glTexCoord2f(0, tmax);     glVertex2f(ball.x * sc - bs, ball.y * sc - bs);
+	glEnd();
+
+	// --- Force GL state required for standard UI font rendering ---
+	glDisable(GL_ALPHA_TEST); // UI Fonts typically use blend, not alpha test
+	glEnable(GL_BLEND);       // Enable blending for transparency
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Set standard blend function
+	glEnable(GL_TEXTURE_2D);  // Ensure texturing is enabled for subsequent font textures
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE); // Set standard texture environment
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f); // Reset color to white (UI functions will set their own color)
+	GL_ClearBindings();       // Unbind Pong-specific textures
+}
+
+void Pong_MouseMove(int x, int y)
+{
+	if (cl_pong.value <= 0 || (!cl.paused && !cl.match_pause_time) || !game_init) return;
+	float sc = GetScale();
+	player.y = Clamp((float)y / sc - player.h * 0.5f, 0.f, (scr_h / sc) - player.h);
+}
 
 //=============================================================================
 
@@ -4624,6 +5018,8 @@ void SCR_UpdateScreen (void)
 		SCR_DrawTurtle ();
 		SCR_DrawPause ();
 		SCR_DrawPause2 (); // woods #showpaused
+		Pong_Update (); // woods #pong
+		Pong_Draw (); // woods #pong
 		SCR_CheckDrawCenterString ();
 		SCR_DrawDevStats (); //johnfitz
 		SCR_DrawFPS (); //johnfitz

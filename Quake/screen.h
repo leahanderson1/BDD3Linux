@@ -42,6 +42,9 @@ void SCR_EndLoadingPlaque (void);
 
 int SCR_ModalMessage (const char *text, float timeout); //johnfitz -- added timeout
 
+void Pong_Init (void); // woods #pong
+void Pong_MouseMove (int x, int y); // woods #pong
+
 extern	float		scr_con_current;
 extern	float		scr_conlines;		// lines of console to display
 

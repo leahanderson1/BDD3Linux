@@ -38,7 +38,8 @@ char	normalname2[32]; // woods #smartafk
 
 extern	char mute[2]; // woods for mute to memory #usermute
 
-static qboolean windowhasfocus = true;	//just in case sdl fails to tell us...
+qboolean windowhasfocus = true;	//just in case sdl fails to tell us... // woods #pong -- remove static
+extern cvar_t cl_pong; // woods #pong
 static qboolean	textmode;
 extern qboolean	bind_grab;	//from the menu code, so that we regrab the mouse in order to pass inputs through
 
@@ -551,7 +552,13 @@ void IN_MouseMotion(int dx, int dy, int wx, int wy)
 		dx = dy = 0;	//don't change view angles etc while unfocused.
 	vid.cursorpos[0] = wx;
 	vid.cursorpos[1] = wy;
-	if (key_dest == key_menu && cls.menu_qcvm.extfuncs.Menu_InputEvent)
+
+	if (cl.paused || cl.match_pause_time > 0) // if the game is paused in any way (regular or match pause) #pong
+	{
+		Pong_MouseMove(wx, wy);
+	}
+
+	else if (key_dest == key_menu && cls.menu_qcvm.extfuncs.Menu_InputEvent)
 	{
 		PR_SwitchQCVM(&cls.menu_qcvm);
 		if (qcvm->cursorforced)
@@ -918,6 +925,7 @@ void IN_MouseMove(usercmd_t *cmd)
 {
 	float	dmx, dmy;
 	float		sens; // woods #zoom (ironwail)
+	qboolean pong_active = cl_pong.value && (cl.paused || cl.match_pause_time); // woods #pong
 
 	sens = tan(DEG2RAD(r_refdef.basefov) * 0.5f) / tan(DEG2RAD(scr_fov.value) * 0.5f); // woods #zoom (ironwail)
 	sens *= sensitivity.value; // woods #zoom (ironwail)
@@ -928,8 +936,17 @@ void IN_MouseMove(usercmd_t *cmd)
 	total_dx = 0;
 	total_dy = 0;
 
-	// do pause check after resetting total_d* so mouse movements during pause don't accumulate
-	if (cl.paused || key_dest != key_game)
+	if (pong_active) // woods #pong
+	{
+		int wx, wy;
+		SDL_GetMouseState(&wx, &wy); // Need to get current absolute position
+		Pong_MouseMove(wx, wy);
+	}
+
+	// do pause/pong check after resetting total_d* so mouse movements don't accumulate
+	// Return if Pong is active OR the game is paused OR input isn't for the game
+	// Also return if demo is playing or match is paused
+	if (pong_active || cl.paused || key_dest != key_game || cls.demoplayback || cl.match_pause_time > 0) // woods #pong
 		return;
 
 	if ( (in_strafe.state & 1) || (lookstrafe.value && (in_mlook.state & 1) ))
