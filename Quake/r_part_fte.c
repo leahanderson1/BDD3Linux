@@ -913,63 +913,91 @@ void PScript_UpdateModelEffects(qmodel_t *mod)
 	}
 }
 
-static part_type_t *P_GetParticleType(const char *config, const char *name)
+static part_type_t *P_GetParticleType(const char *config, const char *name) // woods -- refactor #caustics
 {
-	int i;
-	part_type_t *ptype;
-	part_type_t *oldlist = part_type;
+	/* ---------- 1.  Parse namespace & legacy aliases ---------- */
 	char cfgbuf[MAX_QPATH];
+	const char* cfg = config;
 	char *dot = strchr(name, '.');
 	if (dot && (dot - name) < MAX_QPATH-1)
 	{
-		config = cfgbuf;
 		memcpy(cfgbuf, name, dot - name);
 		cfgbuf[dot - name] = 0;
+		cfg = cfgbuf;
 		name = dot+1;
 	}
 
-	for (i = 0; legacynames[i].oldn; i++)
+	for (size_t n = 0; legacynames[n].oldn; ++n)
+		if (!strcmp(name, legacynames[n].oldn))
 	{
-		if (!strcmp(name, legacynames[i].oldn))
-		{
-			name = legacynames[i].newn;
-			break;
+			name = legacynames[n].newn; break;
+		}
+
+	/* ---------- 2.  Look for an existing type ---------- */
+	for (size_t n = 0; n < numparticletypes; ++n)
+	{
+		part_type_t* pt = &part_type[n];
+		if (!q_strcasecmp(pt->name, name) &&
+			!q_strcasecmp(pt->config, cfg))
+			return pt;                       /* already present – no cache-dirty */
+	}
+
+	/* ---------- 3.  Grow the array ---------- */
+	part_type_t* old_base = part_type;
+	size_t       old_count = numparticletypes;
+
+	part_type = Z_Realloc(part_type, sizeof(part_type_t) * (old_count + 1));
+	if (!part_type)
+		Sys_Error("P_GetParticleType: out of memory (realloc failed)");
+
+	part_type_t* pt_new = &part_type[numparticletypes++];   /* slot for new type */
+	memset(pt_new, 0, sizeof(*pt_new));
+	q_strlcpy(pt_new->name, name, sizeof(pt_new->name));
+	q_strlcpy(pt_new->config, cfg, sizeof(pt_new->config));
+	pt_new->assoc = P_INVALID;
+	pt_new->inwater = P_INVALID;
+	pt_new->cliptype = P_INVALID;
+	pt_new->emit = P_INVALID;
+	pt_new->loaded = 0;
+
+	/* ---------- 4.  Pointer fix-ups if the block moved ---------- */
+	if (old_count > 0 && old_base != part_type)
+	{
+		/* 4a. global run-list */
+		if (part_run_list >= old_base && part_run_list < old_base + old_count)
+			part_run_list = part_type + (part_run_list - old_base);
+
+		/* 4b. nexttorun pointers */
+		for (size_t idx = 0; idx < old_count; ++idx) {
+			part_type_t* pt_fix = &part_type[idx];
+			if (pt_fix->nexttorun >= old_base &&
+				pt_fix->nexttorun < old_base + old_count)
+				pt_fix->nexttorun = part_type + (pt_fix->nexttorun - old_base);
+		}
+
+		/* 4c. rebuild all slooks sharing */
+		for (size_t n = 0; n < numparticletypes; ++n) {
+			plooks_t* share = NULL;
+			for (size_t j = 0; j < n; ++j)
+				if (!memcmp(&part_type[n].looks, &part_type[j].looks,
+					sizeof(plooks_t))) {
+					share = part_type[j].slooks;
+					break;
+				}
+			part_type[n].slooks = share ? share : &part_type[n].looks;
 		}
 	}
-	for (i = 0; i < numparticletypes; i++)
-	{
-		ptype = &part_type[i];
-		if (!q_strcasecmp(ptype->name, name))
-			if (!q_strcasecmp(ptype->config, config))	//must be an exact match.
-				return ptype;
-	}
-	part_type = Z_Realloc(part_type, sizeof(part_type_t)*(numparticletypes+1));
-	ptype = &part_type[numparticletypes++];
-	memset(ptype, 0, sizeof(*ptype));
-	q_strlcpy(ptype->name, name, sizeof(ptype->name));
-	q_strlcpy(ptype->config, config, sizeof(ptype->config));
-	ptype->assoc = P_INVALID;
-	ptype->inwater = P_INVALID;
-	ptype->cliptype = P_INVALID;
-	ptype->emit = P_INVALID;
+	else
+		pt_new->slooks = &pt_new->looks;   /* first allocation or no move */
 
-	if (oldlist)
-	{
-		if (part_run_list)
-			part_run_list = (part_type_t*)((char*)part_run_list - (char*)oldlist + (char*)part_type);
+	/* ---------- 5.  Final init & housekeeping ---------- */
+	pt_new->particles = NULL;
+	pt_new->beams = NULL;
+	pt_new->ramp = NULL;
+	pt_new->nexttorun = NULL;
 
-		for (i = 0; i < numparticletypes; i++)
-			if (part_type[i].nexttorun)
-				part_type[i].nexttorun = (part_type_t*)((char*)part_type[i].nexttorun - (char*)oldlist + (char*)part_type);
-	}
-
-	ptype->loaded = 0;
-	ptype->ramp = NULL;
-	ptype->particles = NULL;
-	ptype->beams = NULL;
-
-	r_plooksdirty = true;
-	return ptype;
+	r_plooksdirty = true;                 /* array grew – cache must rebuild */
+	return pt_new;
 }
 
 //unconditionally allocates a particle object. this allows out-of-order allocations.

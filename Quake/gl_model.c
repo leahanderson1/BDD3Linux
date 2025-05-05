@@ -2098,8 +2098,12 @@ static void Mod_ProcessLeafs_S (dsleaf_t *in, int filelen)
 		for (j=0 ; j<4 ; j++)
 			out->ambient_sound_level[j] = in->ambient_level[j];
 
-		//johnfitz -- removed code to mark surfaces as SURF_UNDERWATER
+		if (out->contents == CONTENTS_WATER || out->contents == CONTENTS_SLIME || out->contents == CONTENTS_LAVA) // woods #caustics
+		{
+			for (j = 0; j < out->nummarksurfaces; j++)
+				out->firstmarksurface[j]->flags |= SURF_UNDERWATER;
 	}
+}
 }
 
 static void Mod_ProcessLeafs_L1 (dl1leaf_t *in, int filelen)
@@ -2141,7 +2145,11 @@ static void Mod_ProcessLeafs_L1 (dl1leaf_t *in, int filelen)
 		for (j=0 ; j<4 ; j++)
 			out->ambient_sound_level[j] = in->ambient_level[j];
 
-		//johnfitz -- removed code to mark surfaces as SURF_UNDERWATER
+		if (out->contents == CONTENTS_WATER || out->contents == CONTENTS_SLIME || out->contents == CONTENTS_LAVA) // woods #caustics
+		{
+			for (j = 0; j < out->nummarksurfaces; j++)
+				out->firstmarksurface[j]->flags |= SURF_UNDERWATER;
+		}
 	}
 }
 
@@ -2184,7 +2192,11 @@ static void Mod_ProcessLeafs_L2 (dl2leaf_t *in, int filelen)
 		for (j=0 ; j<4 ; j++)
 			out->ambient_sound_level[j] = in->ambient_level[j];
 
-		//johnfitz -- removed code to mark surfaces as SURF_UNDERWATER
+		if (out->contents == CONTENTS_WATER || out->contents == CONTENTS_SLIME || out->contents == CONTENTS_LAVA) // woods #caustics
+		{
+			for (j = 0; j < out->nummarksurfaces; j++)
+				out->firstmarksurface[j]->flags |= SURF_UNDERWATER;
+		}
 	}
 }
 

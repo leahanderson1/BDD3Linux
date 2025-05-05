@@ -167,6 +167,7 @@ QS_PFNGLUNIFORM1FPROC GL_Uniform1fFunc = NULL; //ericw
 QS_PFNGLUNIFORM3FPROC GL_Uniform3fFunc = NULL; //ericw
 QS_PFNGLUNIFORM4FPROC GL_Uniform4fFunc = NULL; //ericw
 QS_PFNGLUNIFORM4FVPROC GL_Uniform4fvFunc = NULL; //spike (for iqms)
+QS_PFNGLUNIFORM1IVPROC GL_Uniform1ivFunc = NULL; // woods #caustics
 
 QS_PFNGLCOMPRESSEDTEXIMAGE2DPROC GL_CompressedTexImage2D = NULL;	//spike
 
@@ -1310,6 +1311,7 @@ static void GL_CheckExtensions (void)
 		GL_Uniform3fFunc = (QS_PFNGLUNIFORM3FPROC) SDL_GL_GetProcAddress("glUniform3f");
 		GL_Uniform4fFunc = (QS_PFNGLUNIFORM4FPROC) SDL_GL_GetProcAddress("glUniform4f");
 		GL_Uniform4fvFunc = (QS_PFNGLUNIFORM4FVPROC) SDL_GL_GetProcAddress("glUniform4fv");
+		GL_Uniform1ivFunc = (QS_PFNGLUNIFORM1IVPROC)SDL_GL_GetProcAddress("glUniform1iv"); // woods #caustics
 
 		if (GL_CreateShaderFunc &&
 			GL_DeleteShaderFunc &&
@@ -1334,7 +1336,8 @@ static void GL_CheckExtensions (void)
 			GL_Uniform1fFunc &&
 			GL_Uniform3fFunc &&
 			GL_Uniform4fFunc &&
-			GL_Uniform4fvFunc)
+			GL_Uniform4fvFunc &&
+			GL_Uniform1ivFunc) // woods #caustic
 		{
 			if (cls.state == ca_disconnected) // woods #supressvidmsgs
 				Con_Printf("FOUND: GLSL\n");

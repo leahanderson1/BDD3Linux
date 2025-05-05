@@ -185,6 +185,7 @@ extern	cvar_t	gl_affinemodels;
 extern	cvar_t	gl_polyblend;
 extern	cvar_t	gl_flashblend;
 extern	cvar_t	gl_nocolors;
+extern  cvar_t	gl_caustics; // woods #caustics
 extern	cvar_t	gl_enemycolor; // woods #enemycolors
 extern	cvar_t	gl_teamcolor; // woods #enemycolors
 extern	cvar_t	gl_laserpoint; // woods #laser

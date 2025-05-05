@@ -249,9 +249,10 @@ float GL_WaterAlphaForSurface (msurface_t *fa)
 		return map_wateralpha;// > 0 ? map_wateralpha : map_fallbackalpha;
 }
 
+gltexture_t* underwatertexture; // woods #caustics
 gltexture_t* shelltexture; // woods #powershell
 
-static void R_InitOtherTextures () // woods #powershell
+static void R_InitOtherTextures () // woods #powershell #caustics
 {
 	int w, h;
 	enum srcformat fmt;
@@ -262,6 +263,18 @@ static void R_InitOtherTextures () // woods #powershell
 	{
 		data = Image_LoadImage("textures/shellmap", &w, &h, &fmt, &malloced);
 		shelltexture = TexMgr_LoadImage(NULL, "textures/shellmap", w, h, fmt, data, "textures/shellmap", 0,
+			TEXPREF_ALPHA |      // Allow alpha channel
+			TEXPREF_LINEAR |     // Linear filtering for smoother look
+			TEXPREF_MIPMAP |     // Generate mipmaps for better quality at different scales
+			TEXPREF_PERSIST |    // Keep the texture loaded
+			TEXPREF_NOPICMIP     // Always use full resolution
+		);
+	}
+
+	if (COM_FileExists("textures/water_caustic.tga", NULL))
+	{
+		data = Image_LoadImage("textures/water_caustic", &w, &h, &fmt, &malloced);
+		underwatertexture = TexMgr_LoadImage(NULL, "textures/water_caustic", w, h, fmt, data, "textures/water_caustic", 0, 
 			TEXPREF_ALPHA |      // Allow alpha channel
 			TEXPREF_LINEAR |     // Linear filtering for smoother look
 			TEXPREF_MIPMAP |     // Generate mipmaps for better quality at different scales
@@ -377,6 +390,7 @@ void R_Init (void)
 	Cvar_RegisterVariable (&gl_fullbrights);
 	Cvar_RegisterVariable (&gl_overbright);
 	Cvar_RegisterVariable (&gl_powerupshells); // woods #powershell
+	Cvar_RegisterVariable (&gl_caustics); // woods #caustics
 	Cvar_SetCallback (&gl_fullbrights, GL_Fullbrights_f);
 	Cvar_SetCallback (&gl_overbright, GL_Overbright_f);
 	Cvar_RegisterVariable (&gl_overbright_models);
