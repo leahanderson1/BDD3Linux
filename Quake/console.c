@@ -711,6 +711,15 @@ static void Con_Print (const char *txt)
 				strncpy(cl.observer, "y", sizeof(cl.observer));
 		}
 
+		if (!strstr(txt, "entered the game")) // woods -- #identify+ copy all strings, except entered
+			memcpy(lc, txt, sizeof(lc));
+
+		if (strstr(txt, "entered the game")) // woods -- #identify+ copy the name prior
+			memcpy(lastconnected, lc, sizeof(lastconnected));
+
+		if (strstr(txt, "has connected")) // woods -- #identify+
+			memcpy(lastconnected, txt, sizeof(lastconnected));
+
 		if (Con_ProcessPlayerMessage(txt)) // woods #like
 			return;
 
@@ -808,16 +817,6 @@ static void Con_Print (const char *txt)
 			Con_Printf("\n");
 			return;
 		}
-
-		if (!strstr(txt, "entered the game")) // woods -- #identify+ copy all strings, except entered
-			memcpy(lc, txt, sizeof(lc));
-
-		if (strstr(txt, "entered the game")) // woods -- #identify+ copy the name prior
-			memcpy(lastconnected, lc, sizeof(lastconnected));
-
-		if (strstr(txt, "has connected")) // woods -- #identify+
-			memcpy(lastconnected, txt, sizeof(lastconnected));
-
 	}
 	// end woods for eliminating messages confilter+
 
