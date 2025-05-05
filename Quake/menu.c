@@ -2812,7 +2812,7 @@ void M_Setup_Draw (void)
 			flyme = false;
 	}
 
-	if (!chase_active.value && !cls.demoplayback && host_initialized && !flyme && cls.state == ca_connected) // woods #3rdperson
+	if (!chase_active.value && !cls.demoplayback&& host_initialized && !flyme && cls.state == ca_connected && cl.modtype != 6) // woods #3rdperson
 	{
 		chasewasnotactive = true;
 		Cbuf_AddText("chase_active 1\n");
