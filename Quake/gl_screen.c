@@ -145,6 +145,9 @@ cvar_t		scr_fov = {"fov","90",CVAR_ARCHIVE};	// 10 - 170
 cvar_t		scr_fov_adapt = {"fov_adapt","1",CVAR_ARCHIVE};
 cvar_t		scr_zoomfov = {"zoom_fov","30",CVAR_ARCHIVE};	// 10 - 170 // woods #zoom (ironwail)
 cvar_t		scr_zoomspeed = {"zoom_speed","8",CVAR_ARCHIVE}; // woods #zoom (ironwail)
+cvar_t		scr_scopealpha = {"scr_scopealpha",".55",CVAR_ARCHIVE}; // woods #scope
+cvar_t		scr_scoperadius = {"scr_scoperadius",".4",CVAR_ARCHIVE}; // woods #scope
+cvar_t		scr_scopefadespeed = {"scr_scopefadespeed","70",CVAR_ARCHIVE}; // woods #scope
 cvar_t		scr_conspeed = {"scr_conspeed","500",CVAR_ARCHIVE};
 cvar_t		scr_centertime = {"scr_centertime","2",CVAR_NONE};
 cvar_t		scr_showturtle = {"showturtle","0",CVAR_NONE};
@@ -998,6 +1001,9 @@ void SCR_Init (void)
 	Cvar_RegisterVariable (&scr_fov_adapt); // woods #zoom (ironwail)
 	Cvar_RegisterVariable(&scr_zoomfov); // woods #zoom (ironwail)
 	Cvar_RegisterVariable(&scr_zoomspeed);
+	Cvar_RegisterVariable (&scr_scopealpha); // woods #scope
+	Cvar_RegisterVariable (&scr_scoperadius); // woods #scope
+	Cvar_RegisterVariable (&scr_scopefadespeed); // woods #scope
 	Cvar_RegisterVariable (&scr_viewsize);
 	Cvar_SetCompletion (&scr_viewsize, CompleteViewsize_f); // woods #scrviewsize
 	Cvar_RegisterVariable (&scr_conspeed);
@@ -4841,6 +4847,149 @@ void Pong_MouseMove(int x, int y)
 	player.y = Clamp((float)y / sc - player.h * 0.5f, 0.f, (scr_h / sc) - player.h);
 }
 
+/*
+=================
+Scope Overlay — woods #scope
+=================
+
+A circular vignette for zoom, using the stencil buffer to darken the screen outside
+the reticle. It features a smooth fade-in/out after 50% zoom, an adaptive anti-aliased ring
+*/
+
+static void DrawScopeFadeQuad (float alpha)
+{
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_ALPHA_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glColor4f(0.f, 0.f, 0.f, alpha);          // black with desired strength
+	glBegin(GL_QUADS);
+	glVertex2f(0.f, 0.f);
+	glVertex2f(glwidth, 0.f);
+	glVertex2f(glwidth, glheight);
+	glVertex2f(0.f, glheight);
+	glEnd();
+
+	glColor4f(1.f, 1.f, 1.f, 1.f);            // restore white
+}
+
+static void DrawFilledCircle (float cx, float cy, float r, int segs)
+{
+	glBegin(GL_TRIANGLE_FAN);
+	glVertex2f(cx, cy);           // centre
+	for (int i = 0; i <= segs; ++i) {
+		float a = (float)i / (float)segs * 2.f * (float)M_PI;
+		glVertex2f(cx + cosf(a) * r, cy + sinf(a) * r);
+	}
+	glEnd();
+}
+
+static int Scope_SegmentsForRadius (float r)
+{
+	/* circumference ≈ 2πr  →  segment count ≈ circumference / 2.5  */
+	int segs = (int)(2.f * M_PI * r / 2.5f);
+
+	/* keep it sane */
+	if (segs < 64)   segs = 64;     /* never less than before   */
+	if (segs > 512)  segs = 512;    /* don't blow the CPU/GPU   */
+	return segs;
+}
+
+static void DrawScopeRing (float cx, float cy, float r, float thick)
+{
+	int   segs = Scope_SegmentsForRadius(r);
+	float r_in = r - thick;
+	float r_out = r;
+
+	glDisable(GL_TEXTURE_2D);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glColor4f(0.f, 0.f, 0.f, 1.f);
+
+	glBegin(GL_TRIANGLE_STRIP);
+	for (int i = 0; i <= segs; ++i) {
+		float a = (float)i / segs * 2.f * (float)M_PI;
+		float ca = cosf(a), sa = sinf(a);
+
+		glVertex2f(cx + ca * r_out, cy + sa * r_out);   /* outer edge */
+		glVertex2f(cx + ca * r_in, cy + sa * r_in);   /* inner edge */
+	}
+	glEnd();
+}
+
+
+static void SCR_DrawScopeOverlay (void)
+{
+	GL_SetCanvas(CANVAS_DEFAULT);
+
+	float r_frac = CLAMP(scr_scoperadius.value, 0.05f, 0.49f);
+	float radius = r_frac * q_min((float)glwidth, (float)glheight);
+	float cx = 0.5f * (float)glwidth;
+	float cy = 0.5f * (float)glheight;
+
+	static float fade_alpha = 0.f;          /* carries over frame-to-frame */
+
+	float z = CLAMP(cl.zoom, 0.f, 1.f);     /* 0 → 1, already eases in engine */
+
+	/* progress: 0 until zoom > 0.5, then maps linearly 0 → 1 */
+	float prog = (z > 0.5f) ? (z - 0.5f) * 2.0f : 0.0f;   /* multiply by 2 = (z-0.5)/(1-0.5) */
+
+	/* final target opacity (keep your existing scr_scopealpha cap) */
+	float target_alpha = scr_scopealpha.value * prog;
+
+	/* smoothing – chases target based on scr_scopefadespeed */
+	float k_unclamped = CLAMP(0.1f, scr_scopefadespeed.value, 80.f) * host_frametime; // Corrected order
+	float k = CLAMP(0.0f, k_unclamped, 0.99f); // Corrected order
+	fade_alpha += (target_alpha - fade_alpha) * k;
+
+	if (fade_alpha <= 0.004f && target_alpha <= 0.004f)
+		return;                             /* nothing to draw */
+
+
+	GLint bits;  glGetIntegerv(GL_STENCIL_BITS, &bits);
+	if (!bits) { Con_Printf("No stencil buffer; scope fade disabled\n"); return; }
+
+	glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT |
+		GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |
+		GL_TEXTURE_BIT);
+
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+
+	/*── PASS 1 : write 1s inside the circle ─────────────────────────────*/
+	glEnable(GL_STENCIL_TEST);
+	glStencilMask(0xFF);
+	glClear(GL_STENCIL_BUFFER_BIT);
+
+	glStencilFunc(GL_ALWAYS, 1, 0xFF);
+	glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE);
+
+	/* make sure every fragment makes it to the stencil buffer */
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_ALPHA_TEST);
+	glDisable(GL_CULL_FACE);
+
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+	DrawFilledCircle(cx, cy, radius, Scope_SegmentsForRadius(radius)); // Use adaptive segments for stencil
+
+	/*── PASS 2 : darken where stencil == 0 (outside the glass) ─────────*/
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glStencilMask(0x00);                 /* read-only */
+	glStencilFunc(GL_EQUAL, 0, 0xFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
+	DrawScopeFadeQuad(fade_alpha); // Use fade_alpha here
+
+	/*── PASS 3 : thin black ring (optional) ────────────────────────────*/
+	glDisable(GL_STENCIL_TEST);
+	// Draw the ring only when the fade effect is active and has reached its target opacity
+	if (target_alpha > 0.01f && fabsf(target_alpha - fade_alpha) < 0.01f)
+		DrawScopeRing(cx, cy, radius, 2.f);
+
+	glPopAttrib();
+}
+
 //=============================================================================
 
 //johnfitz -- deleted SCR_BringDownConsole
@@ -5042,6 +5191,7 @@ void SCR_UpdateScreen (void)
 		M_Draw ();
 	}
 
+	SCR_DrawScopeOverlay (); // woods #scope
 	V_UpdateBlend (); //johnfitz -- V_UpdatePalette cleaned up and renamed
 
 	GLSLGamma_GammaCorrect ();
