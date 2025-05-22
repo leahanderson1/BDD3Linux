@@ -43,6 +43,7 @@ extern cvar_t allow_download; // woods #ftehack
 int VID_GetCurrentDPI(void);
 
 extern cvar_t gl_overbright_models; // woods for f_config
+extern qboolean WordFilter_Check(const char* text, char* dest_buffer, size_t buffer_size); // woods #contentfilter
 
 int ogflagprecache = 0, swapflagprecache = 0, swapflagprecache2 = 0, swapflagprecache3 = 0; // woods #alternateflags
 int grenadecache = -1, rocketcache = -1; // woods #r2g
@@ -2886,8 +2887,21 @@ static qboolean CL_ParseSpecialPrints(const char *printtext)
 			{
 				if (!*cl.scores[i].name)
 					continue; //player slot is empty
-				if (strncmp(cl.scores[i].name, n, e-n))
-					continue; //reported name is screwy
+
+				char name_to_compare_with_n[32];
+				if (cl_contentfilter.value == 2)
+				{
+					WordFilter_Check(cl.scores[i].name, name_to_compare_with_n, sizeof(name_to_compare_with_n));
+					name_to_compare_with_n[sizeof(name_to_compare_with_n) - 1] = '\0';
+				}
+				else
+				{
+					Q_strncpy(name_to_compare_with_n, cl.scores[i].name, sizeof(name_to_compare_with_n) - 1);
+					name_to_compare_with_n[sizeof(name_to_compare_with_n) - 1] = '\0';
+				}
+
+				if (strncmp(name_to_compare_with_n, n, e - n))
+					continue; // Names don't match
 
 				cl.scores[i++].ping = ping;
 				cl.printplayer = i;
