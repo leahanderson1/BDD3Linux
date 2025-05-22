@@ -120,6 +120,8 @@ cvar_t		scr_crosshaircolor = {"scr_crosshaircolor", "0xffffff", CVAR_ARCHIVE}; /
 cvar_t		scr_crosshairalpha = {"scr_crosshairalpha", "1", CVAR_ARCHIVE}; // woods #crosshair
 cvar_t		scr_crosshaircshift = { "scr_crosshaircshift", "0xfc7303", CVAR_ARCHIVE}; // woods #crosshair
 cvar_t		scr_crosshairoutline = { "scr_crosshairoutline", "1", CVAR_ARCHIVE }; // woods #crosshair
+cvar_t		scr_crosshair_x = {"scr_crosshair_x", "0", CVAR_ARCHIVE}; // woods #crosshair
+cvar_t		scr_crosshair_y = {"scr_crosshair_y", "0", CVAR_ARCHIVE}; // woods #crosshair
 cvar_t		scr_showfps = {"scr_showfps", "0", CVAR_ARCHIVE};
 cvar_t		scr_clock = {"scr_clock", "0", CVAR_ARCHIVE};
 cvar_t		scr_ping = {"scr_ping", "1", CVAR_ARCHIVE};  // woods #scrping
@@ -973,6 +975,8 @@ void SCR_Init (void)
 	Cvar_RegisterVariable (&scr_crosshairalpha); // woods #crosshair
 	Cvar_RegisterVariable (&scr_crosshaircshift); // woods #crosshair
 	Cvar_RegisterVariable (&scr_crosshairoutline); // woods #crosshair
+	Cvar_RegisterVariable (&scr_crosshair_x); // woods #crosshair
+	Cvar_RegisterVariable (&scr_crosshair_y); // woods #crosshair
 	Cvar_RegisterVariable (&scr_showfps);
 	Cvar_SetCompletion (&scr_clock, &Clock_Completion_f); // woods #iwtabcomplete
 	Cvar_RegisterVariable (&scr_clock);
@@ -3330,51 +3334,54 @@ void SCR_DrawCrosshair (void)
 
 	GL_SetCanvas (CANVAS_CROSSHAIR);
 
+	float cross_x = scr_crosshair_x.value;
+	float cross_y = scr_crosshair_y.value;
+
 	if (crosshair.value == 1)
-		Draw_CharacterRGBA (-4, -4, '+', color, alpha); //0,0 is center of viewport
+		Draw_CharacterRGBA (-4 + cross_x, -4 + cross_y, '+', color, alpha); //0,0 is center of viewport
 
 	if (crosshair.value == 2) 
 	{
 		if (scr_crosshairoutline.value)
-			Draw_FillPlayer (-2, -2, 4, 4, outline, alpha); // simple dot (black bg)
-		Draw_FillPlayer (-1, -1, 2, 2, color, alpha); // simple dot
+			Draw_FillPlayer (-2 + cross_x, -2 + cross_y, 4, 4, outline, alpha); // simple dot (black bg)
+		Draw_FillPlayer (-1 + cross_x, -1 + cross_y, 2, 2, color, alpha); // simple dot
 	}
 
 	if (crosshair.value == 3)
 	{
 		if (scr_crosshairoutline.value) 
 		{
-			Draw_FillPlayer (-2, 5, 4, 12, outline, alpha); // SOUTH (black bg)
-			Draw_FillPlayer (-17, -2, 12, 4, outline, alpha); // WEST (black bg)
-			Draw_FillPlayer (5, -2, 12, 4, outline, alpha); // EAST (black bg)
-			Draw_FillPlayer (-2, -17, 4, 12, outline, alpha); // NORTH (black bg)
+			Draw_FillPlayer (-2 + cross_x, 5 + cross_y, 4, 12, outline, alpha); // SOUTH (black bg)
+			Draw_FillPlayer (-17 + cross_x, -2 + cross_y, 12, 4, outline, alpha); // WEST (black bg)
+			Draw_FillPlayer (5 + cross_x, -2 + cross_y, 12, 4, outline, alpha); // EAST (black bg)
+			Draw_FillPlayer (-2 + cross_x, -17 + cross_y, 4, 12, outline, alpha); // NORTH (black bg)
 		}
-		Draw_FillPlayer (-1, 6, 2, 10, color, alpha); // SOUTH
-		Draw_FillPlayer (-16, -1, 10, 2, color, alpha); // WEST
-		Draw_FillPlayer (6, -1, 10, 2, color, alpha); // EAST
-		Draw_FillPlayer (-1, -16, 2, 10, color, alpha); // NORTH
+		Draw_FillPlayer (-1 + cross_x, 6 + cross_y, 2, 10, color, alpha); // SOUTH
+		Draw_FillPlayer (-16 + cross_x, -1 + cross_y, 10, 2, color, alpha); // WEST
+		Draw_FillPlayer (6 + cross_x, -1 + cross_y, 10, 2, color, alpha); // EAST
+		Draw_FillPlayer (-1 + cross_x, -16 + cross_y, 2, 10, color, alpha); // NORTH
 	}
 
 	if (crosshair.value == 4)
 	{
 		if (scr_crosshairoutline.value)
 		{
-			Draw_FillPlayer (-2, -10, 4, 20, outline, alpha); // vertical (black bg)
-			Draw_FillPlayer (-10, -2, 20, 4, outline, alpha); // horizontal (black bg)
+			Draw_FillPlayer (-2 + cross_x, -10 + cross_y, 4, 20, outline, alpha); // vertical (black bg)
+			Draw_FillPlayer (-10 + cross_x, -2 + cross_y, 20, 4, outline, alpha); // horizontal (black bg)
 		}
-		Draw_FillPlayer (-1, -9, 2, 18, color, alpha); // vertical
-		Draw_FillPlayer (-9, -1, 18, 2, color, alpha); // horizontal
+		Draw_FillPlayer (-1 + cross_x, -9 + cross_y, 2, 18, color, alpha); // vertical
+		Draw_FillPlayer (-9 + cross_x, -1 + cross_y, 18, 2, color, alpha); // horizontal
 	}
 
 	if (crosshair.value == 5)
 	{
 		if (scr_crosshairoutline.value) 
 		{
-			Draw_FillPlayer (-3, -10, 6, 20, outline, 1); // vertical (black bg)
-			Draw_FillPlayer (-10, -3, 20, 6, outline, 1); // horizontal (black bg)
+			Draw_FillPlayer (-3 + cross_x, -10 + cross_y, 6, 20, outline, 1); // vertical (black bg)
+			Draw_FillPlayer (-10 + cross_x, -3 + cross_y, 20, 6, outline, 1); // horizontal (black bg)
 		}
-		Draw_FillPlayer (-2, -9, 4, 18, color, alpha); // vertical (thicker)
-		Draw_FillPlayer (-9, -2, 18, 4, color, alpha); // horizontal (thicker)
+		Draw_FillPlayer (-2 + cross_x, -9 + cross_y, 4, 18, color, alpha); // vertical (thicker)
+		Draw_FillPlayer (-9 + cross_x, -2 + cross_y, 18, 4, color, alpha); // horizontal (thicker)
 	}
 
 	glDisable(GL_DEPTH_TEST);
@@ -3406,26 +3413,26 @@ void SCR_DrawCrosshair (void)
 		if (scr_crosshairoutline.value)
 		{
 			glColor4f(ro, go, bo, alpha); // Black color for outline
-			renderSmoothDot(0.0f, 0.0f, outlineSize); // Slightly larger dot for outline
+			renderSmoothDot(0.0f + cross_x, 0.0f + cross_y, outlineSize); // Slightly larger dot for outline
 		}
 
 		glColor4f(r, g, b, alpha); // Set color for actual dot
-		renderSmoothDot(0.0f, 0.0f, dotSize); // Actual dot size
+		renderSmoothDot(0.0f + cross_x, 0.0f + cross_y, dotSize); // Actual dot size
 	}
 
 	if (crosshair.value == 7)
 	{
 		glColor4f(r, g, b, alpha / 12); // Set color with alpha
-		renderCircle(0.0f, 0.0f, 10.0f, 200, scaledLineWidth); // Draw circle at center with radius 10, more segments for smoothness
+		renderCircle(0.0f + cross_x, 0.0f + cross_y, 10.0f, 200, scaledLineWidth); // Draw circle at center with radius 10, more segments for smoothness
 
 		if (scr_crosshairoutline.value)
 		{
 			glColor4f(ro, go, bo, 1.0f); // Black color for outline
-			renderSmoothDot(0.0f, 0.0f, outlineSize); // Slightly larger dot for outline
+			renderSmoothDot(0.0f + cross_x, 0.0f + cross_y, outlineSize); // Slightly larger dot for outline
 		}
 
 		glColor4f(r, g, b, 1.0f);
-		renderSmoothDot(0.0f, 0.0f, dotSize); // Actual dot size
+		renderSmoothDot(0.0f + cross_x, 0.0f + cross_y, dotSize); // Actual dot size
 	}
 
 	glColor4f(1, 1, 1, 1);
