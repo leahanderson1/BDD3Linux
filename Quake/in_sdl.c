@@ -1526,7 +1526,7 @@ void IN_SendKeyEvents (void)
 					key_dest == key_game)
 				 {
 				Pong_ToggleFreeze();
-				break;  /* consume the click – don’t pass to the game */
+				break;  /* consume the click */
 				}
 
 			if (key_dest == key_menu) // woods #mousemenu
