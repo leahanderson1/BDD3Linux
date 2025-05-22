@@ -474,7 +474,7 @@ void GLAlias_CreateShaders (void)
 			GL_Uniform1iFunc (glsl->fullbrightTexLoc, 1);
 			GL_Uniform1iFunc (glsl->lowerTexLoc, 2);
 			GL_Uniform1iFunc (glsl->upperTexLoc, 3);
-			GL_Uniform1iFunc (glsl->outlineWidthLoc, 0.0f); // woods #routline
+			GL_Uniform1fFunc (glsl->outlineWidthLoc, 0.0f); // woods #routline
 			GL_Uniform1iFunc (glsl->isOutlinePassLoc, 0); // woods #routline
 			GL_Uniform1iFunc (glsl->shellTexLoc, 3);  // woods #powershell
 			GL_Uniform1iFunc(glsl->shellModeLoc, 0);  // woods #powershell
