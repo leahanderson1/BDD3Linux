@@ -103,6 +103,10 @@ void TexturePointer_Draw(void); // woods #texturepointer
 extern qpic_t* sb_nums[2][11]; // woods #varmatchclock
 extern qpic_t* sb_colon; // woods #varmatchclock
 
+extern cvar_t scr_scoreboard_teamsort; // woods #teamscoreboard
+void Sbar_SortFrags_TeamOrder(qboolean sort_ascending); // woods #teamscoreboard
+qboolean Sbar_ShouldSortByTeam(void); // woods #teamscoreboard
+
 //johnfitz -- new cvars
 cvar_t		scr_menuscale = {"scr_menuscale", "1", CVAR_ARCHIVE};
 cvar_t		scr_centerprintbg = {"scr_centerprintbg", "0", CVAR_ARCHIVE}; // 0 = off; 1 = text box; 2 = menu box; 3 = menu strip -- woods #centerprintbg (iw)
@@ -156,6 +160,7 @@ cvar_t		scr_showturtle = {"showturtle","0",CVAR_NONE};
 cvar_t		scr_showpause = {"showpause","1",CVAR_NONE};
 cvar_t		scr_printspeed = {"scr_printspeed","8",CVAR_NONE};
 cvar_t		scr_autoid = {"scr_autoid","1",CVAR_ARCHIVE}; // woods #autoid
+cvar_t		scr_scoreboard_teamsort = {"scr_scoreboard_teamsort","0",CVAR_ARCHIVE}; // woods #teamscoreboard
 cvar_t		gl_triplebuffer = {"gl_triplebuffer", "1", CVAR_ARCHIVE};
 
 cvar_t		cl_gun_fovscale = {"cl_gun_fovscale","1",CVAR_ARCHIVE}; // Qrack
@@ -1016,6 +1021,7 @@ void SCR_Init (void)
 	Cvar_RegisterVariable (&scr_centertime);
 	Cvar_RegisterVariable (&scr_printspeed);
 	Cvar_RegisterVariable (&scr_autoid); // woods #autoid
+	Cvar_RegisterVariable (&scr_scoreboard_teamsort); // woods #teamscoreboard
 	Cvar_RegisterVariable (&gl_triplebuffer);
 	Cvar_RegisterVariable (&cl_gun_fovscale);
 	Cvar_RegisterVariable (&cl_menucrosshair); // woods #menucrosshair
@@ -2119,9 +2125,6 @@ void SCR_ShowObsFrags(void)
 		sb_sigil[2] = Draw_PicFromWad("sb_sigil3");
 		sb_sigil[3] = Draw_PicFromWad("sb_sigil4");
 
-		icons_initialized = true;
-	}
-
 	obs_frags_active = true;
 
 	if ((cl.gametype == GAME_DEATHMATCH) && (cls.state == ca_connected))
@@ -2134,7 +2137,14 @@ void SCR_ShowObsFrags(void)
 			!strcmp(obs, "eyecam") || !strcmp(obs, "chase") || !strcmp(obs, "fly") || !strcmp(obs, "walk") ||
 			!strcmp(star_obs, "eyecam") || !strcmp(star_obs, "chase") || !strcmp(star_obs, "fly") || !strcmp(star_obs, "walk"))
 		{
-			Sbar_SortFrags_Obs ();
+			if (scr_scoreboard_teamsort.value && Sbar_ShouldSortByTeam()) // woods #teamscoreboard
+			{
+				Sbar_SortFrags_TeamOrder(true);
+			}
+			else
+			{
+				Sbar_SortFrags_Obs();
+			}
 
 			if (clampedSbar == 3)
 			{

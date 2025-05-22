@@ -533,6 +533,185 @@ void Sbar_SortFrags (qboolean ignorespecs)
 
 /*
 ===============
+Team Sorted Scoreboard -- woods #teamscoreboard
+===============
+*/
+
+extern cvar_t scr_scoreboard_teamsort;
+
+#define COLOR_NONE   0        /* "no team / orphan" */
+#define COLOR_FREE  -99       /* legacy lone-wolf   */
+
+typedef struct {
+	int color;
+	int score;
+	int members[MAX_SCOREBOARD];
+	int nmembers;
+} team_t;
+
+static int cmp_team_desc(const void* a, const void* b)
+{
+	const team_t* ta = a, * tb = b;
+	return (tb->score - ta->score);            // descending
+}
+static int cmp_player_desc(const void* a, const void* b)
+{
+	const int ia = *(const int*)a;
+	const int ib = *(const int*)b;
+	return cl.scores[ib].frags - cl.scores[ia].frags;
+}
+
+static int cmp_team_asc(const void* a, const void* b) {
+	const team_t* ta = (const team_t*)a;
+	const team_t* tb = (const team_t*)b;
+	return (ta->score - tb->score);
+}
+
+static int cmp_player_asc(const void* a, const void* b) {
+	const int ia = *(const int*)a;
+	const int ib = *(const int*)b;
+	return cl.scores[ia].frags - cl.scores[ib].frags;
+}
+
+void Sbar_SortFrags_TeamOrder(qboolean sort_ascending)
+{
+	team_t teams[MAX_SCOREBOARD];
+	int    nteams = 0;
+
+	/* 1.  Build per-team buckets in one pass */
+	for (int i = 0; i < cl.maxclients; ++i) {
+		scoreboard_t* s = &cl.scores[i];
+		if (!s->name[0] || s->spectator)
+			continue;
+
+		int col = s->pants.basic;
+		if (col == COLOR_NONE || col == COLOR_FREE)
+			continue;                          // lone wolf -> later
+
+		/* find / add team slot */
+		int t;
+		for (t = 0; t < nteams && teams[t].color != col; ++t);
+		if (t == nteams) {
+			if (nteams >= MAX_SCOREBOARD)      // defensive; should never hit
+				continue;
+			teams[t].color = col;
+			teams[t].score = 0;
+			teams[t].nmembers = 0;
+			++nteams;
+		}
+		teams[t].members[teams[t].nmembers++] = i;
+		teams[t].score += s->frags;
+	}
+
+	/* 2.  Sort teams by total score */
+	if (sort_ascending) {
+		qsort(teams, nteams, sizeof(team_t), cmp_team_asc);
+	}
+	else {
+		qsort(teams, nteams, sizeof(team_t), cmp_team_desc);
+	}
+
+	/* 3.  Emit players team-by-team into fragsort[] */
+	int n = 0;
+	for (int t = 0; t < nteams && n < MAX_SCOREBOARD; ++t) {
+		/* sort this slice by individual frags */
+		if (sort_ascending) {
+			qsort(teams[t].members, teams[t].nmembers, sizeof(int), cmp_player_asc);
+		}
+		else {
+			qsort(teams[t].members, teams[t].nmembers, sizeof(int), cmp_player_desc);
+		}
+
+		int copy = teams[t].nmembers;
+		if (n + copy > MAX_SCOREBOARD)
+			copy = MAX_SCOREBOARD - n;
+
+		memcpy(&fragsort[n], teams[t].members, copy * sizeof(int));
+		n += copy;
+	}
+
+	/* 4.  Append lone-wolves (color 0 or -99) */
+	for (int i = 0; i < cl.maxclients && n < MAX_SCOREBOARD; ++i) {
+		scoreboard_t* s = &cl.scores[i];
+		if (!s->name[0] || s->spectator)
+			continue;
+
+		int col = s->pants.basic;
+		if (col != COLOR_NONE && col != COLOR_FREE)
+			continue;
+
+		/* insertion sort into existing ordered list */
+		int pos;
+		if (sort_ascending) {
+			for (pos = 0; pos < n && cl.scores[fragsort[pos]].frags <= s->frags; ++pos);
+		}
+		else {
+			for (pos = 0; pos < n && cl.scores[fragsort[pos]].frags >= s->frags; ++pos);
+		}
+
+		if (n < MAX_SCOREBOARD) {
+			memmove(&fragsort[pos + 1],
+				&fragsort[pos],
+				(n - pos) * sizeof(int));
+			fragsort[pos] = i;
+			++n;
+		}
+	}
+
+	scoreboardlines = n;
+}
+
+qboolean Sbar_ShouldSortByTeam(void)
+{
+	if (cl.modtype != 1 && cl.modtype != 4) {
+		return false;
+	}
+
+	char mode[16];
+	char playmode[16];
+	const char* mode_val;
+	const char* playmode_val;
+	const char* info_source;
+
+	if (cl.modtype == 4) {
+		if (cl.realviewentity < 1 || cl.realviewentity > MAX_SCOREBOARD) {
+			return false;
+		}
+		info_source = cl.scores[cl.realviewentity - 1].userinfo;
+	}
+	else {
+		info_source = cl.serverinfo;
+	}
+
+	mode_val = Info_GetKey(info_source, "mode", mode, sizeof(mode));
+	if (!mode_val || mode_val[0] == '\0') {
+		return false;
+	}
+
+	playmode_val = Info_GetKey(info_source, "playmode", playmode, sizeof(playmode));
+	if (!playmode_val || playmode_val[0] == '\0') {
+		return false;
+	}
+
+	// For CTF, sort by team unless playmode is "practice"
+	if (!q_strcasecmp(mode_val, "ctf")) {
+		if (q_strcasecmp(playmode_val, "practice")) // true if NOT practice
+			return true;
+		return false;
+	}
+
+	// For DM, sort by team only if playmode is "match"
+	if (!q_strcasecmp(mode_val, "dm")) {
+		if (!q_strcasecmp(playmode_val, "match"))
+			return true;
+		return false;
+	}
+
+	return false;
+}
+
+/*
+===============
 Sbar_SortFrags_Obs -- woods for vertical upwards sorting #observerhud
 ===============
 */
@@ -2293,7 +2472,13 @@ void Sbar_DeathmatchOverlay (void)
 	//M_DrawPic ((320-pic->width)/2, 8, pic); woods #scoreboard
 
 // scores
-	Sbar_SortFrags (false);
+	if (scr_scoreboard_teamsort.value && Sbar_ShouldSortByTeam()) // woods #teamscoreboard
+	{
+		Sbar_SortFrags_TeamOrder(false);
+	}
+	else {
+		Sbar_SortFrags(false); // Standard sort for all other cases
+	}
 
 // draw the text
 	l = scoreboardlines;
