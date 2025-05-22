@@ -4059,6 +4059,12 @@ void CL_ParseServerMessage (void)
 		case svc_updatename:
 			Sbar_Changed ();
 			i = MSG_ReadByte ();
+			if (cl.maxclients <= 0) // woods - serverinfo not received yet, consume args so buffer stays aligned
+			{
+				MSG_ReadString();
+				Con_DPrintf("Skipped early svc_updatename (slot %d) before serverinfo\n", i);
+				break;
+			}
 			if (i >= cl.maxclients)
 				Host_Error ("CL_ParseServerMessage: svc_updatename (%u) > MAX_SCOREBOARD (%u)", i, cl.maxclients); // woods - temporary? fix for connection issue
 			q_strlcpy (cl.scores[i].name, MSG_ReadString(), MAX_SCOREBOARDNAME);
@@ -4068,6 +4074,12 @@ void CL_ParseServerMessage (void)
 		case svc_updatefrags:
 			Sbar_Changed ();
 			i = MSG_ReadByte ();
+			if (cl.maxclients <= 0) // woods - serverinfo not received yet, consume args so buffer stays aligned
+			{
+				MSG_ReadShort();
+				Con_DPrintf("Skipped early svc_updatefrags (slot %d) before serverinfo\n", i);
+				break;
+			}
 			if (i >= cl.maxclients)
 				Host_Error ("CL_ParseServerMessage: svc_updatefrags > MAX_SCOREBOARD");
 			cl.scores[i].frags = MSG_ReadShort ();
@@ -4076,6 +4088,12 @@ void CL_ParseServerMessage (void)
 		case svc_updatecolors:
 			Sbar_Changed ();
 			i = MSG_ReadByte ();
+			if (cl.maxclients <= 0) // woods - serverinfo not received yet, consume args so buffer stays aligned
+			{
+				MSG_ReadByte();
+				Con_DPrintf("Skipped early svc_updatecolors (slot %d) before serverinfo\n", i);
+				break;
+			}
 			if (i >= cl.maxclients)
 				Host_Error ("CL_ParseServerMessage: svc_updatecolors > MAX_SCOREBOARD");
 			CL_NewTranslation (i, MSG_ReadByte());
