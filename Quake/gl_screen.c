@@ -2976,16 +2976,21 @@ void SCR_Observing(void)
 	if ((cl.gametype == GAME_DEATHMATCH) && (cls.state == ca_connected))
 	{
 		char printtxt[25];
+		char original_observing_name[25]; // Buffer to store the original name from Info_GetKey
 		char buf2[25];
 		char buf3[25];
 		char buf4[25];
 		const char* obs;
 		const char* star_obs;
-		const char* observing;
+		const char* observing_ptr;
 		int color, y;
 		obs = Info_GetKey(cl.scores[cl.realviewentity - 1].userinfo, "observer", buf2, sizeof(buf2));
 		star_obs = Info_GetKey(cl.scores[cl.realviewentity - 1].userinfo, "*observer", buf4, sizeof(buf4));
-		observing = Info_GetKey(cl.scores[cl.realviewentity - 1].userinfo, "observing", buf3, sizeof(buf3));
+		observing_ptr = Info_GetKey(cl.scores[cl.realviewentity - 1].userinfo, "observing", buf3, sizeof(buf3));
+
+		Q_strncpy(original_observing_name, observing_ptr, sizeof(original_observing_name) - 1);
+		original_observing_name[sizeof(original_observing_name) - 1] = '\0';
+
 		color = cl.scores[cl.viewentity - 1].pants.basic; // get color 0-13
 		color = Sbar_ColorForMap((color & 15) << 4); // translate to proper drawfill color
 		int clampedSbar = CLAMP(1, (int)scr_sbar.value, 3);
@@ -3004,8 +3009,20 @@ void SCR_Observing(void)
 		if (cl.intermission || qeintermission || crxintermission)
 			return;
 
-		if (!strcmp(observing, "off"))
+		if (!strcmp(original_observing_name, "off")) // Check original name
 			return;
+
+		char name_to_display[25];
+		if (cl_contentfilter.value == 2) // Assuming this is your condition to apply the filter
+		{
+			WordFilter_Check(original_observing_name, name_to_display, sizeof(name_to_display));
+			name_to_display[sizeof(name_to_display) - 1] = '\0';
+		}
+		else
+		{
+			Q_strncpy(name_to_display, original_observing_name, sizeof(name_to_display) -1);
+			name_to_display[sizeof(name_to_display) - 1] = '\0';
+		}
 
 		GL_SetCanvas(CANVAS_SBAR2);
 
@@ -3013,16 +3030,16 @@ void SCR_Observing(void)
 		{
 			if (!strcmp(obs, "chase") || !strcmp(star_obs, "chase")) // chase
 			{
-				sprintf(printtxt, "%s", observing); // print who you are observering
-				M_PrintWhite(166 - (strlen(observing)*4), y, printtxt);
+				sprintf(printtxt, "%s", name_to_display);
+				M_PrintWhite(166 - (strlen(name_to_display)*4), y, printtxt);
 			}
 			else if (!strcmp(obs, "eyecam") || !strcmp(star_obs, "eyecam")) // eyecam
 			{
 				if (r_drawviewmodel.value)
-					Draw_Fill(152 - strlen(observing)*4, y, (strlen(observing)*8) + 15, 9, 0, .8); // show their color
-				sprintf(printtxt, "%s", observing); // // print self (name), viewentity hack (eyecam thinks your are them)
-				M_PrintWhite(165-strlen(observing)*4, y, printtxt);
-				Draw_Fill(154 - (strlen(observing)*4), y + 1, 7, 7, color, 1); // show their color
+					Draw_Fill(152 - strlen(name_to_display)*4, y, (strlen(name_to_display)*8) + 15, 9, 0, .8); // show their color
+				sprintf(printtxt, "%s", name_to_display); 
+				M_PrintWhite(165-strlen(name_to_display)*4, y, printtxt);
+				Draw_Fill(154 - (strlen(name_to_display)*4), y + 1, 7, 7, color, 1); // show their color
 			}		
 		}
 	}
