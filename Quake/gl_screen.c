@@ -2110,6 +2110,8 @@ void SCR_ShowObsFrags(void)
 	if (scr_viewsize.value >= 120)
 		return;
 
+	if (cl.modtype == 1 && !cl.notobserver && scr_obsitems.value)
+	{
 		if (COM_FileExists("gfx/ibar2.lmp", NULL))
 			weapon_icons = Draw_CachePic("gfx/ibar2.lmp");
 
@@ -2123,6 +2125,7 @@ void SCR_ShowObsFrags(void)
 		sb_sigil[1] = Draw_PicFromWad("sb_sigil2");
 		sb_sigil[2] = Draw_PicFromWad("sb_sigil3");
 		sb_sigil[3] = Draw_PicFromWad("sb_sigil4");
+	}
 
 	obs_frags_active = true;
 
