@@ -4512,6 +4512,65 @@ static qboolean sprite_checked = false;
 
 static float    last_upd_time = 0;
 static float    player_paddle_flash_time = 0.0f; // Time when the flash should end
+static qboolean pong_user_frozen = false;
+
+void Pong_ToggleFreeze(void)
+{
+	pong_user_frozen = !pong_user_frozen;
+}
+
+/* ----------------------------------------------------------------------
+   Return the PAUSE‑banner rectangle in "virtual" coordinates.
+   ---------------------------------------------------------------------- */
+static qboolean Pong_GetPauseRect(float sc,
+	float* x, float* y, float* w, float* h)
+{
+	if (!pong_pause_pic)                       /* texture not in memory   */
+		return false;
+
+	/* 1. Base menu-scale used by the *actual* canvas ------------------- */
+	float menuscale =
+		cl.match_pause_time ? scr_menuscale.value - 1.f   // CANVAS_MENU2
+		: scr_menuscale.value;        // CANVAS_MENU
+	menuscale = Clamp(menuscale, 1.f, menuscale);             // keep ≥ 1
+
+	const float msc = Clamp(q_min((float)glwidth / 320.f,
+		(float)glheight / 200.f),
+		1.f, menuscale);
+
+
+	/* -----------------------------------------------------------------
+	   Choose the picture width/height we’re going to *centre*.
+	   ----------------------------------------------------------------- */
+	float pic_w = pong_pause_pic->width;
+	float pic_h = pong_pause_pic->height;
+
+	/* QUICK HACK: if external 24‑bit textures are OFF, assume the stock
+	   128×24 LMP so the X‑position lines up with what’s drawn.          */
+	if (!gl_load24bit.value)
+		pic_w = 128;                          /* << the only new line   */
+
+	/* Square sprite safety: fix broken 24×24 headers */
+	if (pic_w == pic_h && pic_h > 0)
+		pic_w = pic_h * (128.0f / 24.0f);     /* ≈ 5.333× wider */
+
+	/* 2. Pixel‑space rectangle (matches SCR_DrawPause) ---------------- */
+	float px = ((320 - pic_w) * 0.5f) * msc +
+		(glwidth - 320.f * msc) * 0.5f;
+	float py = ((240 - 48 - pic_h) * 0.5f) * msc +
+		(glheight - 200.f * msc) * 0.5f;
+	float pw = pic_w * msc;
+	float ph = pic_h * msc;
+
+	/* DEBUG overlay – keep or remove as you wish */
+	//Draw_Fill(px, py, pw, ph, 236, 0.3f);
+
+	/* 3. Convert back to our 1920×1080 “virtual” space ---------------- */
+	*x = px / sc;  *y = py / sc;
+	*w = pw / sc;  *h = ph / sc;
+	return true;
+}
+
 
 void Pong_Init(void)
 {
@@ -4526,6 +4585,7 @@ void Pong_Init(void)
 static void Pong_Reset(void)
 {
 	const float sc = GetScale();
+	pong_user_frozen = false;
 	scr_w = vid.width;  scr_h = vid.height;
 
 	player.w = ai.w = paddle_w;
@@ -4546,17 +4606,12 @@ static void Pong_Reset(void)
 
 	ai.x = 20; ai.y = ((scr_h / sc) - paddle_h) * 0.5f; ai.speed = 300.f;
 
-	if (!pong_pause_pic) // Use cached pause pic
-	{
-		pong_pause_pic = Draw_CachePic("gfx/pause.lmp"); // Attempt to cache again if init failed
-		if (!pong_pause_pic) return; // Cannot proceed without pause pic
-	}
-	float msc = Clamp(q_min((float)glwidth / 320.f, (float)glheight / 200.f),
-		1.f, scr_menuscale.value);
-	float top = (((240 - 48 - pong_pause_pic->height) / 2) * msc + (glheight - 200 * msc) / 2) / sc;
+	float prx, pry, prw, prh;
+	if (!Pong_GetPauseRect(sc, &prx, &pry, &prw, &prh))
+	    return;                   /* nothing to bounce off - bail */
 
 	ball.x = (scr_w / sc) * 0.5f;
-	ball.y = Clamp(top - ball.size * 8, ball.size * 4, (scr_h / sc) * 0.25f);
+	ball.y = Clamp(pry - ball.size * 8, ball.size * 4, (scr_h / sc) * 0.25f);
 	float ang = ((rand() % 60) - 30) * (M_PI / 180.f);
 	float dir = (rand() % 2) ? 1.f : -1.f;
 	ball.dx = dir * cosf(ang); ball.dy = sinf(ang);
@@ -4608,7 +4663,9 @@ void Pong_Update(void)
 		pong_last_maptime_init = maptime; // Update our stored maptime
 	}
 
-	qboolean frozen = (key_dest != key_game || !windowhasfocus); // Check if the game logic should be frozen
+	qboolean frozen = (pong_user_frozen ||
+		key_dest != key_game ||
+		!windowhasfocus);
 
 	// Initialize the game on the first *active* frame if needed
 	// We also need last_upd_time to be set correctly before calculating dt
@@ -4649,23 +4706,23 @@ void Pong_Update(void)
 	if (ball.y + ball.size * 0.5f > sh) { ball.y = sh - ball.size * 0.5f;ball.dy = -ball.dy; }
 
 	/* bounce off pause pic --------------------------------------------- */
-	// Use cached pause pic
-	if (!pong_pause_pic) return; // Cannot bounce if pic not loaded
-	float msc = Clamp(q_min((float)glwidth / 320.f, (float)glheight / 200.f),
-		1.f, scr_menuscale.value);
-	float px = ((320 - pong_pause_pic->width) / 2) * msc + (glwidth - 320 * msc) / 2;
-	float py = ((240 - 48 - pong_pause_pic->height) / 2) * msc + (glheight - 200 * msc) / 2;
-	float pw = pong_pause_pic->width * msc, ph = pong_pause_pic->height * msc;
-	px /= sc; py /= sc; pw /= sc; ph /= sc;
-	if (ball.x + ball.size * 0.5f > px && ball.x - ball.size * 0.5f < px + pw &&
-		ball.y + ball.size * 0.5f > py && ball.y - ball.size * 0.5f < py + ph)
+	float prx, pry, prw, prh;
+	if (Pong_GetPauseRect(sc, &prx, &pry, &prw, &prh) &&
+	    ball.x + ball.size * .5f > prx && ball.x - ball.size * .5f < prx + prw &&
+	    ball.y + ball.size * .5f > pry && ball.y - ball.size * .5f < pry + prh)
 	{
-		float d[4] = { ball.x - px,(px + pw) - ball.x,ball.y - py,(py + ph) - ball.y };
-		int s = 0; for (int i = 1;i < 4;i++)if (d[i] < d[s])s = i;
-		if (s == 0) { ball.x = px - ball.size * 0.5f;ball.dx = -fabsf(ball.dx); }
-		if (s == 1) { ball.x = px + pw + ball.size * 0.5f;ball.dx = fabsf(ball.dx); }
-		if (s == 2) { ball.y = py - ball.size * 0.5f;ball.dy = -fabsf(ball.dy); }
-		if (s == 3) { ball.y = py + ph + ball.size * 0.5f;ball.dy = fabsf(ball.dy); }
+	    /* choose the nearest side and reflect */
+	    float d[4] = { ball.x - prx, (prx + prw) - ball.x,
+	                   ball.y - pry, (pry + prh) - ball.y };
+	    int side = 0;
+	    for (int i = 1; i < 4; ++i) if (d[i] < d[side]) side = i;
+
+	    switch (side) {
+	        case 0: ball.x = prx - ball.size * .5f;   ball.dx = -fabsf(ball.dx); break;
+	        case 1: ball.x = prx + prw + ball.size * .5f; ball.dx =  fabsf(ball.dx); break;
+	        case 2: ball.y = pry - ball.size * .5f;   ball.dy = -fabsf(ball.dy); break;
+	        case 3: ball.y = pry + prh + ball.size * .5f; ball.dy =  fabsf(ball.dy); break;
+	    }
 	}
 
 	/* paddle collision macro ------------------------------------------- */
@@ -4754,14 +4811,12 @@ void Pong_Draw(void)
 	const float sc = GetScale();
 
 	/* scores ----------------------------------------------------------- */
-	// Use cached pause pic
-	if (!pong_pause_pic) return; // Cannot draw scores relative to pause pic if not loaded
-	float msc = Clamp(q_min((float)glwidth / 320.f, (float)glheight / 200.f),
-		1.f, scr_menuscale.value);
-	int px320 = (320 - pong_pause_pic->width) / 2, py320 = (240 - 48 - pong_pause_pic->height) / 2;
-	int psx = px320 * msc + (glwidth - 320 * msc) / 2,
-		psy = py320 * msc + (glheight - 200 * msc) / 2,
-		pw = pong_pause_pic->width * msc, ph = pong_pause_pic->height * msc;
+	float prx, pry, prw, prh;
+	if (!Pong_GetPauseRect(sc, &prx, &pry, &prw, &prh))
+	    return;        /* still loading */
+
+	int psx = prx * sc, psy = pry * sc;      /* back to pixels for drawing */
+	int pw  = prw * sc, ph  = prh * sc;
 
 	glEnable(GL_TEXTURE_2D); glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Set standard blend func
@@ -4837,14 +4892,14 @@ void Pong_Draw(void)
 	glTexCoord2f(0, tmax);     glVertex2f(ball.x * sc - bs, ball.y * sc - bs);
 	glEnd();
 
-	// --- Force GL state required for standard UI font rendering ---
-	glDisable(GL_ALPHA_TEST); // UI Fonts typically use blend, not alpha test
-	glEnable(GL_BLEND);       // Enable blending for transparency
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Set standard blend function
-	glEnable(GL_TEXTURE_2D);  // Ensure texturing is enabled for subsequent font textures
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE); // Set standard texture environment
-	glColor4f(1.0f, 1.0f, 1.0f, 1.0f); // Reset color to white (UI functions will set their own color)
-	GL_ClearBindings();       // Unbind Pong-specific textures
+	/* ---------- restore “classic console” GL state ------------------ */
+	glEnable(GL_ALPHA_TEST);                                   /* hard mask   */
+	glAlphaFunc(GL_GREATER, 0.666f);                            /* typical cut-off */
+	glDisable(GL_BLEND);                                        /* opaque glyphs   */
+	glEnable(GL_TEXTURE_2D);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE); /* ignore colour   */
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);                          /* white           */
+	GL_ClearBindings();                                         /* unbind sprites  */
 }
 
 void Pong_MouseMove(int x, int y)

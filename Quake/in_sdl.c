@@ -40,6 +40,7 @@ extern	char mute[2]; // woods for mute to memory #usermute
 
 qboolean windowhasfocus = true;	//just in case sdl fails to tell us... // woods #pong -- remove static
 extern cvar_t cl_pong; // woods #pong
+extern void Pong_ToggleFreeze(void); // woods #pong
 static qboolean	textmode;
 extern qboolean	bind_grab;	//from the menu code, so that we regrab the mouse in order to pass inputs through
 
@@ -332,9 +333,18 @@ static void IN_UpdateGrabs_Internal(qboolean forecerelease)
 	qboolean freemouse;		//the OS should have a free cursor too...
 	qboolean needevents;	//whether we want to receive events still
 
+	qboolean pong_active = cl_pong.value && (cl.paused || cl.match_pause_time > 0) && key_dest == key_game; // woods #pong active?
 	qboolean gamecodecursor = (key_dest == key_game && cl.qcvm.cursorforced) || (key_dest == key_menu && cls.menu_qcvm.cursorforced);
 	wantcursor = ((key_dest == key_game && CL_IsActiveObserver() && !obs_cursor_hidden) || (key_dest == key_menu&&!bind_grab)) || gamecodecursor || !windowhasfocus; // woods no cursor needed in console
+	
+	if (pong_active) // woods #pong
+		wantcursor = false;
+	
 	freemouse = wantcursor || gamecodecursor || (key_dest == key_game && CL_IsActiveObserver()); // woods #mousemenu - keep free mouse mode even when cursor is hidden
+
+	if (pong_active) // woods #pong
+		freemouse = true;
+
 	needevents = (!wantcursor) || key_dest == key_game;
 
 	if (isDedicated)
@@ -1507,6 +1517,15 @@ void IN_SendKeyEvents (void)
 				}
 				break;
 			}
+
+				if (event.button.state == SDL_PRESSED && // woods #pong
+					event.button.button == SDL_BUTTON_LEFT &&
+					cl_pong.value && (cl.paused || cl.match_pause_time) &&
+					key_dest == key_game)
+				 {
+				Pong_ToggleFreeze();
+				break;  /* consume the click – don’t pass to the game */
+				}
 
 			if (key_dest == key_menu) // woods #mousemenu
 				M_Mousemove(event.button.x, event.button.y);
