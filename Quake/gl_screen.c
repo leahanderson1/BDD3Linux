@@ -1979,7 +1979,7 @@ void SCR_DrawMatchScores(void)
 		return;
 
 	// Check if we need to calculate team scores manually (for demos)
-	if (cls.demoplayback && (!cl.teamscores[0].colors || !cl.teamscores[1].colors)) {
+	if (cls.demoplayback && cl.teamscores && (!cl.teamscores[0].colors || !cl.teamscores[1].colors)) {
 		use_demo_calculation = true;
 			}
 
