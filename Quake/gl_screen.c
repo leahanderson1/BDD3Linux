@@ -140,6 +140,7 @@ cvar_t		scr_matchclockscale = {"scr_matchclockscale", "1",CVAR_ARCHIVE}; // wood
 cvar_t		scr_showscores = {"scr_showscores", "0",CVAR_ARCHIVE}; // woods #observerhud
 cvar_t		scr_shownet = {"scr_shownet", "0",CVAR_ARCHIVE}; // woods #shownet scr_obscenterprint
 cvar_t		scr_obscenterprint = {"scr_obscenterprint", "0",CVAR_ARCHIVE}; // woods
+cvar_t		scr_obsitems = {"scr_obsitems", "1",CVAR_ARCHIVE}; // woods
 cvar_t		scr_hints = {"scr_hints", "1",CVAR_ARCHIVE}; // woods #qssmhints
 //johnfitz
 cvar_t		scr_usekfont = {"scr_usekfont", "0", CVAR_NONE}; // 2021 re-release
@@ -997,6 +998,7 @@ void SCR_Init (void)
 	Cvar_RegisterVariable (&scr_showscores); // woods #observerhud
 	Cvar_RegisterVariable (&scr_shownet); // woods #shownet
 	Cvar_RegisterVariable (&scr_obscenterprint); // woods
+	Cvar_RegisterVariable (&scr_obsitems); // woods
 	Cvar_RegisterVariable (&scr_hints); // woods #qssmhints
 	//johnfitz
 	Cvar_RegisterVariable(&scr_demobar_timeout); // woods (iw) #democontrols
@@ -2095,7 +2097,6 @@ void SCR_ShowObsFrags(void)
 	const char* star_obs;
 	int clampedSbar = CLAMP(1, (int)scr_sbar.value, 3);
 	static qpic_t* weapon_icons = NULL;
-	static qboolean icons_initialized = false;
 	static qpic_t* sb_quad = NULL;
 	static qpic_t* sb_pent = NULL;
 	static qpic_t* sb_ring = NULL;
@@ -2109,8 +2110,6 @@ void SCR_ShowObsFrags(void)
 	if (scr_viewsize.value >= 120)
 		return;
 
-	if (!icons_initialized && cl.modtype == 1 && !cl.notobserver)
-	{
 		if (COM_FileExists("gfx/ibar2.lmp", NULL))
 			weapon_icons = Draw_CachePic("gfx/ibar2.lmp");
 
@@ -2210,7 +2209,7 @@ void SCR_ShowObsFrags(void)
 				M_PrintWhite(x + 50, y, shortname);
 
 				// Only draw items if cl.modtype == 1 and !cl.notobserver
-				if (cl.modtype == 1 && !cl.notobserver)
+				if (cl.modtype == 1 && !cl.notobserver && scr_obsitems.value)
 				{
 					// Calculate name width for icon placement
 					int nameWidth = strlen(shortname) * 8;
@@ -3966,8 +3965,20 @@ SCR_DrawObsTimers -- woods #obstimers
 */
 void SCR_DrawObsTimers (void)
 {
-	if (cl.modtype != 1 || !cl.itemtimers || cl.intermission ||
-		qeintermission || crxintermission || scr_viewsize.value >= 130)
+	char playmode_buf[32]; // Buffer for the playmode string
+	const char* playmode_val;
+	qboolean is_playmode_match;
+
+	// Get the playmode from server info
+	playmode_val = Info_GetKey(cl.serverinfo, "playmode", playmode_buf, sizeof(playmode_buf));
+	is_playmode_match = (strcmp(playmode_val, "match") == 0);
+	
+	if (!scr_obsitems.value || !cl.itemtimers ||
+		cl.intermission ||
+		qeintermission ||
+		crxintermission ||
+		scr_viewsize.value >= 130 ||
+		(is_playmode_match && !cl.matchinp))
 		return;
 
 #define MAX_VISIBLE_TIMERS 32
