@@ -5194,11 +5194,11 @@ void SCR_UpdateScreen (void)
 		SCR_Mute (); // woods #usermute
 		SCR_Observing (); // woods
 		TexturePointer_Draw (); // woods #texturepointer
+		SCR_DrawScopeOverlay (); // woods #scope
 		SCR_DrawConsole ();
 		M_Draw ();
 	}
 
-	SCR_DrawScopeOverlay (); // woods #scope
 	V_UpdateBlend (); //johnfitz -- V_UpdatePalette cleaned up and renamed
 
 	GLSLGamma_GammaCorrect ();
