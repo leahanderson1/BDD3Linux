@@ -3315,7 +3315,18 @@ if (!strcmp(printtext, "Client ping times:\n") && (cl.expectingpingtimes > realt
 			MSG_WriteByte(&cls.message, clc_stringcmd);
 			MSG_WriteString(&cls.message, va("say Video: %s", videoc));
 			MSG_WriteByte(&cls.message, clc_stringcmd);
-			MSG_WriteString(&cls.message, va("say %s %d ppi", videosetg, dpi_num));
+
+			char resolution_suffix[10] = "";
+
+			// Use vid.width and vid.height which are updated when videosetg is set
+			if ((vid.width == 3840 && vid.height == 2160) || (vid.width == 4096 && vid.height == 2160)) { // Common 4K resolutions
+				strcpy(resolution_suffix, " (4k)");
+			}
+			else if (vid.width == 2560 && vid.height == 1440) { // Common 2K resolution (QHD)
+				strcpy(resolution_suffix, " (2k)");
+			}
+
+			MSG_WriteString(&cls.message, va("say %s %d ppi%s", videosetg, dpi_num, resolution_suffix));
 			MSG_WriteByte(&cls.message, clc_stringcmd);
 			MSG_WriteString(&cls.message, va("say Audio: %s", sound));
 		
