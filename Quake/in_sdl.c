@@ -1327,6 +1327,8 @@ static void IN_HandleObserverMouseEvents (SDL_Event* event) // woods #eyemouse
 					Cbuf_AddText("flyme\n");
 				else
 					Cbuf_AddText("impulse 142\n");
+				Cbuf_AddText("wait;wait;setinfo observing off\n");
+
 				last_flyme_time = current_time;
 			}
 		}
