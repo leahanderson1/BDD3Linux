@@ -1584,6 +1584,14 @@ void SCR_DrawMatchClock(void)
 				const char* simt;
 				simt = Info_GetKey(cl.serverinfo, "matchtime", buf, sizeof(buf));
 				tl = atoi(simt);
+
+				char buf2[10];
+				const char* mode;
+				mode = Info_GetKey(cl.serverinfo, "mode", buf2, sizeof(buf2));
+
+				if (!q_strcasecmp(mode, "clanarena") || !q_strcasecmp(mode, "wipeout"))
+					tl = 0;
+
 			}
 			else if (cl.modtype == 4) // qecrx server check, if so parse userinfo for timelimit
 			{
@@ -1659,6 +1667,13 @@ void SCR_DrawMatchClock(void)
 			{
 				int scr_matchclock_int = (int)scr_matchclock.value; // get the integer part of scr_matchclock.value
 
+				char buf3[10];
+				const char* mode;
+				mode = Info_GetKey(cl.serverinfo, "mode", buf3, sizeof(buf3));
+
+				if (!q_strcasecmp(mode, "clanarena") || !q_strcasecmp(mode, "wipeout"))
+					return;
+				
 				if (scr_matchclock_int == 1 || scr_matchclock_int == 2)
 				{
 					int color = 0; // Default to brown
