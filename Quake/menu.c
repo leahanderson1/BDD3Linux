@@ -12141,36 +12141,68 @@ void M_ServerList_Draw (void)
 			else
 				server.active = false;
 
-		char serverStr[40];
+		char pingStrBuffer[8];
+		char* pingStrToPrint = pingStrBuffer;
 
-		char pingStr[8];
+		if (serversmenu.items[idx].ping == -1) {
+			pingStrBuffer[0] = '\0';
+		}
+		else {
+			q_snprintf(pingStrBuffer, sizeof(pingStrBuffer), "%3i", serversmenu.items[idx].ping);
+			while (*pingStrToPrint == ' ' && *pingStrToPrint != '\0') {
+				pingStrToPrint++;
+			}
+		}
 
-		if (serversmenu.items[idx].ping == -1)
-			pingStr[0] = '\0';
-		else if (serversmenu.items[idx].isLoading)
-			q_snprintf(pingStr, sizeof(pingStr), "%3i", serversmenu.items[idx].ping);	
-		else 
-			q_snprintf(pingStr, sizeof(pingStr), "%3i", serversmenu.items[idx].ping);
+		char linePrefixStr[32];
+		q_snprintf(linePrefixStr, sizeof(linePrefixStr), "%-16.16s  %-6.6s %2u/%2u ",
+			serversmenu.items[idx].name,
+			serversmenu.items[idx].map,
+			serversmenu.items[idx].users,
+			serversmenu.items[idx].maxusers);
 
-		q_snprintf(serverStr, sizeof(serverStr), "%-16.16s  %-6.6s %2u/%2u %s\n", serversmenu.items[idx].name, serversmenu.items[idx].map, serversmenu.items[idx].users, serversmenu.items[idx].maxusers, pingStr);
+		int current_y_pos = y + i * 8;
+		int current_x_pos = x;
 
-		if (server.active)
-			M_PrintWhite(x, y + i * 8, serverStr);
-		else
-			M_Print(x, y + i * 8, serverStr);
+		if (server.active) {
+			M_PrintWhite(current_x_pos, current_y_pos, linePrefixStr);
+		}
+		else {
+			M_Print(current_x_pos, current_y_pos, linePrefixStr);
+		}
+
+		int ping_display_x = current_x_pos + ((int)strlen(linePrefixStr) * 8);
+
+		if (pingStrToPrint[0] != '\0') {
+			int current_ping = serversmenu.items[idx].ping;
+			if (current_ping <= 60) {
+				M_PrintWhite(ping_display_x, current_y_pos, pingStrToPrint); // Green for pings <= 60
+			}
+			else if (current_ping <= 120) {
+				M_Print2(ping_display_x, current_y_pos, pingStrToPrint); // White for pings 61-120
+			}
+			else { // Pings > 120
+				if (server.active) { // Active servers with high ping remain white
+					M_PrintWhite(ping_display_x, current_y_pos, pingStrToPrint);
+				}
+				else { // Inactive servers with high ping use default M_Print color
+					M_Print(ping_display_x, current_y_pos, pingStrToPrint);
+				}
+			}
+		}
 
 		if (selected)
-			M_DrawCharacter(x - 8, y + i * 8, 12 + ((int)(realtime * 4) & 1));
+			M_DrawCharacter(x - 8, current_y_pos, 12 + ((int)(realtime * 4) & 1));
 
-		q_snprintf(serverStr, sizeof(serverStr), "%-34.34s", serversmenu.items[idx].name);
+		char infoStr[40];
 
+		q_snprintf(infoStr, sizeof(infoStr), "%-34.34s", serversmenu.items[idx].name);
 		if (selected)
-			M_PrintWhite(x, y + serversmenu.list.viewsize * 8 + 12, serverStr);
+			M_PrintWhite(x, y + serversmenu.list.viewsize * 8 + 12, infoStr);
 
-		q_snprintf(serverStr, sizeof(serverStr), "%-34.34s", serversmenu.items[idx].ip);
-
+		q_snprintf(infoStr, sizeof(infoStr), "%-34.34s", serversmenu.items[idx].ip);
 		if (selected)
-			M_PrintWhite(x, y + serversmenu.list.viewsize * 8 + 20, serverStr);
+			M_PrintWhite(x, y + serversmenu.list.viewsize * 8 + 20, infoStr);
 	}
 
 	if (M_List_GetOverflow(&serversmenu.list) > 0) {
