@@ -600,7 +600,6 @@ void SCR_DrawCenterString (void) //actually do the drawing
 	}
 
 	scr_erase_center = 0;
-	start = scr_centerstring;
 
 	if (scr_center_lines <= 4)
 		y = 200*0.35;	//johnfitz -- 320x200 coordinate system
