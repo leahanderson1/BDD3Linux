@@ -1383,6 +1383,9 @@ static void CL_ParseServerInfo (void)
 
 	Con_DPrintf ("Serverinfo packet received.\n");
 
+	if (cl_autodemo.value && cls.demorecording && !cls.demoplayback)
+		Cbuf_AddText("stop\n");
+
 // ericw -- bring up loading plaque for map changes within a demo.
 //          it will be hidden in CL_SignonReply.
 	if (cls.demoplayback)
