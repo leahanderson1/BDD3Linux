@@ -256,7 +256,6 @@ void GLAlias_CreateShaders (void)
 		"	s2 *= -140.0 * (0.5 / 64.0);\n"
 		"	float t2 = TexCoords.y + sin(0.4 * (-ClTime + TexCoords.x));\n"
 		"	t2 *= -140.0 * (0.5 / 64.0);\n"
-		"	ShellCoord = vec2(s, t);\n"
 		"	ShellCoord2 = vec2(s2, t2);\n"
 		"\n"
 		"#ifdef SKELETAL\n"
@@ -279,6 +278,7 @@ void GLAlias_CreateShaders (void)
 		"	// Transform the vertex position\n" // woods #routline
 		"	vec4 basePos = (vec4(Pose1Vert.xyz, 1.0) * wmat);\n"
 		"	vec3 transformedNormal = normalize((vec4(Pose1Normal.xyz, 0.0) * wmat).xyz);\n"
+		"   lerpedNormal = transformedNormal; // initialise for later use\n"
 		"\n"
 		"	float outlineScale = 1.0;\n"
 		"	if (isOutlinePass == 1 && outlineWidth > 0.0)\n"
