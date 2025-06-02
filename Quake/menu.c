@@ -4287,9 +4287,9 @@ void M_Keys_Draw(void)
 	p = Draw_CachePic("gfx/ttl_cstm.lmp");
 	M_DrawPic((320 - p->width) / 2, 4, p);
 	if (bind_grab)
-		M_Print(12, 32, "Press a key or button for this action");
+		M_Print(12, 32, "press a key or button for this action");
 	else
-		M_Print(18, 32, "Enter to change, backspace to clear");
+		M_Print(18, 32, "enter to change, backspace to clear");
 
 	x = 0;
 	y = 48;
@@ -4995,7 +4995,7 @@ Graphics Menu
 
 extern cvar_t r_particles, gl_load24bit, r_replacemodels, r_lerpmodels, r_lerpmove, r_scale, r_outline,
 vid_gamma, vid_contrast, vid_fsaa, r_particledesc, gl_loadlitfiles, r_rocketlight, r_explosionlight,
-gl_powerupshells;
+gl_powerupshells, gl_caustics;
 
 static enum graphics_e
 {
@@ -5016,6 +5016,7 @@ static enum graphics_e
 	GRAPHICS_BRUSHSHADOW,
 	GRAPHICS_MODELOUTLINES,
 	GRAPHICS_POWERUPSHELLS,
+	GRAPHICS_WATERCAUSTICS,
 	GRAPHICS_COUNT
 } graphics_cursor;
 
@@ -5071,6 +5072,8 @@ static const char* M_Graphics_GetItemText(int index)
 		return "Model Outlines";
 	case GRAPHICS_POWERUPSHELLS:
 		return "Powerup Shells";
+	case GRAPHICS_WATERCAUSTICS:
+		return "Water Caustics";
 	default:
 		q_snprintf(buffer, sizeof(buffer), "Unknown Item %d", index);
 		return buffer;
@@ -5249,6 +5252,15 @@ static void M_Graphics_AdjustSliders(int dir)
 		if (value < 0) value = 2;
 		if (value > 2) value = 0;
 		Cvar_SetValue("gl_powerupshells", value);
+		break;
+	}
+
+	case GRAPHICS_WATERCAUSTICS:
+	{
+		float f_wc = gl_caustics.value + dir * 0.1f; // Slider 0-100% maps to value 0-10
+		f_wc = CLAMP(0, f_wc, 10);
+		Cvar_SetValue("gl_caustics", f_wc);
+		break;
 	}
 	break;
 	}
@@ -5397,6 +5409,12 @@ void M_Graphics_Draw(void)
 			else
 				value = "light only";
 			M_Print(178, y, value);
+			break;
+
+		case GRAPHICS_WATERCAUSTICS:
+			text = "    Water Caustics"; // Adjust spacing as needed
+			r = gl_caustics.value / 10.0f; // Normalize 0-10 value to 0-1 for slider
+			M_DrawSlider(186, y, r, gl_caustics.value * 10.0f, "%.0f%%"); // Display as 0-100%
 			break;
 
 		default:
@@ -5591,7 +5609,8 @@ void M_Graphics_Key(int k)
 				graphics_cursor == GRAPHICS_ALIASSHADOW ||
 				graphics_cursor == GRAPHICS_ROCKETLIGHT ||
 				graphics_cursor == GRAPHICS_EXPLOSIONLIGHT ||
-				graphics_cursor == GRAPHICS_MODELOUTLINES)
+				graphics_cursor == GRAPHICS_MODELOUTLINES ||
+				graphics_cursor == GRAPHICS_WATERCAUSTICS)
 			{
 				graphics_slider_grab = true;
 			}
@@ -5677,6 +5696,11 @@ void M_Graphics_Mousemove(int cx, int cy)
 		case GRAPHICS_MODELOUTLINES:
 			f = M_MouseToSliderFraction(cx - 187) * 5;
 			Cvar_SetValue("r_outline", CLAMP(0, f, 5));
+			break;
+
+		case GRAPHICS_WATERCAUSTICS: // Added
+			f = M_MouseToSliderFraction(cx - 187) * 10.0f; // Convert slider fraction (0-1) to value (0-10)
+			Cvar_SetValue("gl_caustics", CLAMP(0, f, 10));
 			break;
 
 			// Add empty cases for all other enum values to suppress warnings
@@ -6262,7 +6286,8 @@ Game Menu
 */
 
 extern cvar_t cl_rollangle, scr_fov, gl_cshiftpercent, cl_bob, v_kicktime, v_kickroll, v_kickpitch, r_drawviewmodel,
-cl_damagehue, w_switch, b_switch, cl_say, cl_r2g, cl_truelightning, cl_deadbodyfilter, con_mm1mute;
+cl_damagehue, w_switch, b_switch, cl_say, cl_r2g, cl_truelightning, cl_deadbodyfilter, con_mm1mute,
+gl_max_size, gl_load24bit;
 
 enum
 {
@@ -6290,6 +6315,7 @@ static enum game_e
 	GAME_VIEWMODEL,      // Added
 	GAME_TEAMCOLOR,  // Added
 	GAME_ENEMYCOLOR, // Added
+	GAME_TEXTURELESS,
 	GAME_COUNT
 } game_cursor;
 
@@ -6453,6 +6479,8 @@ static const char* M_Game_GetItemText(int index)
 		return "Force Team Color";
 	case GAME_ENEMYCOLOR:
 		return "Force Enemy Color";
+	case GAME_TEXTURELESS:
+		return "Textureless";
 	default:
 		q_snprintf(buffer, sizeof(buffer), "Unknown Item %d", index);
 		return buffer;
@@ -6601,6 +6629,36 @@ static void M_Game_AdjustSliders(int dir)
 	case GAME_ENEMYCOLOR:
 		M_Game_AdjustColor(dir, false);
 		break;
+
+	case GAME_TEXTURELESS:
+	{
+		qboolean textureless_is_currently_on = (gl_max_size.value == 1.0f);
+		float original_load24bit_value = gl_load24bit.value;
+
+		if (textureless_is_currently_on) // Currently ON, user wants to turn OFF
+		{
+			Cvar_SetValue("gl_max_size", 0.0f); // Primary action: turn Textureless OFF
+
+			if (original_load24bit_value == 2.0f)
+			{
+				Cvar_SetValue("gl_load24bit", 1.0f);
+			}
+			// If original_load24bit_value was 0, it remains 0 as per rule.
+			// If original_load24bit_value was 1, it remains 1 (no specific rule to change it on OFF).
+		}
+		else // Currently OFF, user wants to turn ON
+		{
+			Cvar_SetValue("gl_max_size", 1.0f); // Primary action: turn Textureless ON
+
+			if (original_load24bit_value == 1.0f)
+			{
+				Cvar_SetValue("gl_load24bit", 2.0f);
+			}
+			// If original_load24bit_value was 0, it remains 0 as per rule.
+			// If original_load24bit_value was 2, it remains 2 (no specific rule to change it on ON if not 0 or 1).
+		}
+		break;
+	}
 
 	case GAME_COUNT:
 		break;
@@ -6752,6 +6810,11 @@ void M_Game_Draw(void)
 			M_Print(178, y, value);
 			if (strcmp(gl_enemycolor.string, "") != 0)
 				Draw_FillPlayer(178 + (strlen(value) * 8) + 4, y + 2, 6, 6, CL_PLColours_Parse(gl_enemycolor.string), 1.0);
+			break;
+
+		case GAME_TEXTURELESS:
+			text = "       Textureless"; // Adjusted spacing
+			M_DrawCheckbox(178, y, gl_max_size.value == 1.0f);
 			break;
 
 		default:
@@ -7064,7 +7127,8 @@ HUD Menu
 */
 
 extern cvar_t scr_sbar, scr_showfps, scr_match_hud, scr_matchclock, scr_ping, scr_clock, 
-scr_showspeed, scr_sbarfacecolor, scr_showscores, scr_autoid, scr_movekeys, scr_conscale, scr_sbaralphaqwammo;
+scr_showspeed, scr_sbarfacecolor, scr_showscores, scr_autoid, scr_movekeys, scr_conscale, 
+scr_sbaralphaqwammo, scr_obsitems, scr_scoreboard_teamsort;
 
 static enum hud_e
 {
@@ -7083,6 +7147,8 @@ static enum hud_e
 	HUD_AUTOID,
 	HUD_MOVEKEYS,
 	HUD_CONSOLEFONT,
+	HUD_OBSITEMS,
+	HUD_SCOREBOARD_SORT,
 	HUD_COUNT
 } hud_cursor;
 
@@ -7137,6 +7203,10 @@ static const char* M_HUD_GetItemText(int index)
 		return "Movement Keys";
 	case HUD_CONSOLEFONT:
 		return "Console Font Size";
+	case HUD_OBSITEMS:
+		return "Observer Items";
+	case HUD_SCOREBOARD_SORT:
+		return "Scoreboard Sort";
 
 	default:
 		q_snprintf(buffer, sizeof(buffer), "Unknown Item %d", index);
@@ -7247,6 +7317,17 @@ static void M_HUD_AdjustSliders(int dir)
 		Cvar_SetValue("scr_conscale", f);
 		break;
 
+	case HUD_OBSITEMS:
+		Cvar_SetValue("scr_obsitems", !scr_obsitems.value);
+		break;
+
+	case HUD_SCOREBOARD_SORT:
+		value = scr_scoreboard_teamsort.value + dir;
+		if (value > 1) value = 0;
+		if (value < 0) value = 1;
+		Cvar_SetValue("scr_scoreboard_teamsort", value);
+		break;
+
 	default:
 		break;
 	}
@@ -7300,10 +7381,10 @@ void M_HUD_Draw(void)
 			text = "  Status Bar Style";
 			switch ((int)scr_sbar.value)
 			{
-			case 1: value = "Classic"; break;
-			case 2: value = "Quakeworld"; break;
-			case 3: value = "Modern/Remaster"; break;
-			default: value = "Unknown"; break;
+			case 1: value = "classic"; break;
+			case 2: value = "quakeworld"; break;
+			case 3: value = "modern/remaster"; break;
+			default: value = "unknown"; break;
 			}
 			M_Print(178, y, value);
 			break;
@@ -7332,16 +7413,16 @@ void M_HUD_Draw(void)
 			text = "        Show Clock";
 			switch ((int)scr_clock.value)
 			{
-			case 0: value = "Off"; break;
-			case 1: value = "Level Time"; break;
-			case 2: value = "12hr Clock"; break;
-			case 3: value = "24hr Clock"; break;
-			case 4: value = "Date Only"; break;
-			case 5: value = "Date + 12hr"; break;
-			case 6: value = "Date + 24hr"; break;
-			case 7: value = "Score/12hr"; break;
-			case 8: value = "Score/24hr"; break;
-			default: value = "Unknown"; break;
+			case 0: value = "off"; break;
+			case 1: value = "level time"; break;
+			case 2: value = "12hr clock"; break;
+			case 3: value = "24hr clock"; break;
+			case 4: value = "date only"; break;
+			case 5: value = "date + 12hr"; break;
+			case 6: value = "date + 24hr"; break;
+			case 7: value = "score/12hr"; break;
+			case 8: value = "score/24hr"; break;
+			default: value = "unknown"; break;
 			}
 			M_Print(178, y, value);
 			break;
@@ -7350,10 +7431,10 @@ void M_HUD_Draw(void)
 			text = "        Show Speed";
 			switch ((int)scr_showspeed.value)
 			{
-			case 0: value = "Off"; break;
-			case 1: value = "Numbers"; break;
-			case 2: value = "Visual Meter"; break;
-			default: value = "Unknown"; break;
+			case 0: value = "off"; break;
+			case 1: value = "numbers"; break;
+			case 2: value = "visual meter"; break;
+			default: value = "unknown"; break;
 			}
 			M_Print(178, y, value);
 			break;
@@ -7384,6 +7465,22 @@ void M_HUD_Draw(void)
 			text = " Console Font Size";
 			r = (scr_conscale.value - 1) / 5.0; // Scale to 1-6 range
 			M_DrawSlider(186, y, r, scr_conscale.value, "%.1f");
+			break;
+
+		case HUD_OBSITEMS:
+			text = "    Observer Items";
+			M_DrawCheckbox(178, y, scr_obsitems.value);
+			break;
+
+		case HUD_SCOREBOARD_SORT:
+			text = "   Scoreboard Sort";
+			switch ((int)scr_scoreboard_teamsort.value)
+			{
+			case 0: value = "frag totals"; break;
+			case 1: value = "teams totals"; break;
+			default: value = "frag totals"; break;
+			}
+			M_Print(178, y, value);
 			break;
 
 		}
@@ -7589,6 +7686,16 @@ void M_HUD_Key(int k)
 			Cvar_SetValue("scr_clock", value);
 			break;
 		}
+		case HUD_OBSITEMS:
+			Cvar_SetValue("scr_obsitems", !scr_obsitems.value);
+			break;
+		case HUD_SCOREBOARD_SORT:
+		{
+			int val = scr_scoreboard_teamsort.value + 1;
+			if (val > 1) val = 0;
+			Cvar_SetValue("scr_scoreboard_teamsort", val);
+		}
+		break;
 		default:
 			M_HUD_AdjustSliders(1);
 			break;
@@ -7647,6 +7754,16 @@ void M_HUD_Key(int k)
 				int value = scr_clock.value + 1;
 				if (value > 8) value = 0;
 				Cvar_SetValue("scr_clock", value);
+			}
+			else if (hud_cursor == HUD_OBSITEMS)
+			{
+				Cvar_SetValue("scr_obsitems", !scr_obsitems.value);
+			}
+			else if (hud_cursor == HUD_SCOREBOARD_SORT)
+			{
+				int val = scr_scoreboard_teamsort.value + 1;
+				if (val > 1) val = 0;
+				Cvar_SetValue("scr_scoreboard_teamsort", val);
 			}
 			else if (hud_cursor == HUD_SHOWSPEED)
 			{
@@ -7753,6 +7870,8 @@ void M_HUD_Mousemove(int cx, int cy)
 		case HUD_SHOWSCORES:
 		case HUD_AUTOID:
 		case HUD_MOVEKEYS:
+		case HUD_OBSITEMS:
+		case HUD_SCOREBOARD_SORT:
 		case HUD_COUNT:
 			// No action needed for these cases in mouse movement
 			break;
@@ -7787,7 +7906,8 @@ Crosshair Menu
 
 qboolean crosshair_menu;
 
-extern cvar_t scr_crosshairalpha, scr_crosshaircolor, scr_crosshairoutline, scr_crosshairscale, crosshair;
+extern cvar_t scr_crosshairalpha, scr_crosshaircolor, scr_crosshairoutline, scr_crosshairscale, crosshair,
+scr_crosshair_x, scr_crosshair_y;
 
 static enum crosshair_e
 {
@@ -7796,6 +7916,8 @@ static enum crosshair_e
 	CROSSHAIR_COLOR,
 	CROSSHAIR_OUTLINE,
 	CROSSHAIR_SCALE,
+	CROSSHAIR_X,
+	CROSSHAIR_Y,
 	CROSSHAIR_COUNT
 } crosshair_cursor;
 
@@ -8037,6 +8159,10 @@ static const char* M_Crosshair_GetItemText(int index)
 		return "Crosshair Outline";
 	case CROSSHAIR_SCALE:
 		return "Crosshair Scale";
+	case CROSSHAIR_X:
+		return "Horizontal (X) Adjustment";
+	case CROSSHAIR_Y:
+		return "Vertical (Y) Adjustment";
 	default:
 		q_snprintf(buffer, sizeof(buffer), "Unknown Item %d", index);
 		return buffer;
@@ -8099,6 +8225,19 @@ static void M_Crosshair_AdjustSliders(int dir)
 		if (f > 10) f = 10;
 		else if (f < 1) f = 1;
 		Cvar_SetValue("scr_crosshairscale", f);
+		break;
+
+	case CROSSHAIR_X:
+		f = scr_crosshair_x.value + dir * 1.0;
+		if (f > 10) f = 10;
+		else if (f < -10) f = -10;
+		Cvar_SetValue("scr_crosshair_x", f);
+		break;
+	case CROSSHAIR_Y:
+		f = scr_crosshair_y.value + dir * 1.0;
+		if (f > 10) f = 10;
+		else if (f < -10) f = -10;
+		Cvar_SetValue("scr_crosshair_y", f);
 		break;
 
 	default:
@@ -8168,6 +8307,31 @@ void M_Crosshair_Draw(void)
 			M_DrawSlider(186, y, r, scr_crosshairscale.value, "%.1f");
 			break;
 
+		case CROSSHAIR_X:
+			text = "        X-Adjust";
+			{ // Use a block to scope temp variables
+				float current_x_val = scr_crosshair_x.value;
+				float display_x_val = roundf(current_x_val);
+				if (display_x_val == -0.0f) { // Check for negative zero
+					display_x_val = 0.0f;     // Convert to positive zero
+				}
+				r = (current_x_val + 10.0f) / 20.0f; // Slider position based on actual cvar value
+				M_DrawSlider(186, y, r, display_x_val, "%.0f"); // Display corrected value
+			}
+			break;
+		case CROSSHAIR_Y:
+			text = "        Y-Adjust";
+			{ // Use a block to scope temp variables
+				float current_y_val = scr_crosshair_y.value;
+				float display_y_val = roundf(current_y_val);
+				if (display_y_val == -0.0f) { // Check for negative zero
+					display_y_val = 0.0f;     // Convert to positive zero
+				}
+				r = (current_y_val + 10.0f) / 20.0f; // Slider position based on actual cvar value
+				M_DrawSlider(186, y, r, display_y_val, "%.0f"); // Display corrected value
+			}
+			break;
+
 		default:
 			break;
 		}
@@ -8190,7 +8354,7 @@ void M_Crosshair_Draw(void)
 	}
 
 	if (crosshair.value > 0)
-		M_DrawMenuCrosshair(160, 100);
+		M_DrawMenuCrosshair(160 + (int)scr_crosshair_x.value, 100 + (int)scr_crosshair_y.value);
 
 	// Draw cursor
 	M_DrawCharacter(168, 48 + crosshair_cursor * 8, 12 + ((int)(realtime * 4) & 1));
@@ -8305,7 +8469,7 @@ void M_Crosshair_Key(int k)
 		{
 			crosshair_cursor = (m_mousey - 48) / 8;
 
-			if (crosshair_cursor == CROSSHAIR_ALPHA || crosshair_cursor == CROSSHAIR_SCALE)
+			if (crosshair_cursor == CROSSHAIR_ALPHA || crosshair_cursor == CROSSHAIR_SCALE || crosshair_cursor == CROSSHAIR_X || crosshair_cursor == CROSSHAIR_Y)
 			{
 				crosshair_slider_grab = true;
 			}
@@ -8370,6 +8534,14 @@ void M_Crosshair_Mousemove(int cx, int cy)
 			f = 1.0f + M_MouseToSliderFraction(cx - 187) * 9.0f;
 			Cvar_SetValue("scr_crosshairscale", f);
 			break;
+		case CROSSHAIR_X:
+			f = -10.0f + M_MouseToSliderFraction(cx - 187) * 20.0f;
+			Cvar_SetValue("scr_crosshair_x", f);
+			break;
+		case CROSSHAIR_Y:
+			f = -10.0f + M_MouseToSliderFraction(cx - 187) * 20.0f;
+			Cvar_SetValue("scr_crosshair_y", f);
+			break;
 		default:
 			break;
 		}
@@ -8397,7 +8569,7 @@ Console Menu
 ==================
 */
 
-extern cvar_t scr_conscale, scr_consize, scr_conspeed, scr_conalpha;
+extern cvar_t scr_conscale, scr_consize, scr_conspeed, scr_conalpha, cl_contentfilter;
 
 static enum console_e
 {
@@ -8405,6 +8577,7 @@ static enum console_e
 	CONSOLE_HEIGHT,
 	CONSOLE_SPEED,
 	CONSOLE_TRANSPARENCY,
+	CONSOLE_CONTENTFILTER,
 	CONSOLE_COUNT
 } console_cursor;
 
@@ -8436,6 +8609,8 @@ static const char* M_Console_GetItemText(int index)
 		return "Down/Up Speed";
 	case CONSOLE_TRANSPARENCY:
 		return "Transparency";
+	case CONSOLE_CONTENTFILTER:
+		return "Content Filter";
 	default:
 		q_snprintf(buffer, sizeof(buffer), "Unknown Item %d", index);
 		return buffer;
@@ -8459,6 +8634,7 @@ void M_Menu_Console_f(void)
 static void M_Console_AdjustSliders(int dir)
 {
 	float f;
+	int val;
 	S_LocalSound("misc/menu3.wav");
 
 	switch (console_cursor)
@@ -8490,6 +8666,13 @@ static void M_Console_AdjustSliders(int dir)
 		else if (f < 0) f = 0;
 		Cvar_SetValue("scr_conalpha", f);
 		break;
+
+	case CONSOLE_CONTENTFILTER:
+		val = (int)cl_contentfilter.value + dir;
+		if (val > 2) val = 0;
+		else if (val < 0) val = 2;
+		Cvar_SetValue("cl_contentfilter", val);
+		break;
 	default:
 		break;
 	}
@@ -8500,6 +8683,7 @@ void M_Console_Draw(void)
 	qpic_t* p;
 	float r;
 	enum console_e i;
+	const char* filter_text;
 
 	p = Draw_CachePic("gfx/p_option.lmp");
 	M_DrawPic((320 - p->width) / 2, 4, p);
@@ -8536,6 +8720,18 @@ void M_Console_Draw(void)
 			text = "    Transparency";
 			r = scr_conalpha.value;
 			M_DrawSlider(186, y, r, scr_conalpha.value * 100, "%.0f%%");
+			break;
+
+		case CONSOLE_CONTENTFILTER:
+			text = "  Content Filter";
+			switch ((int)cl_contentfilter.value)
+			{
+			case 0: filter_text = "off"; break;
+			case 1: filter_text = "partial"; break;
+			case 2: filter_text = "full"; break;
+			default: filter_text = "unknown"; break;
+			}
+			M_Print(180, y, filter_text);
 			break;
 
 		default:
@@ -8815,7 +9011,8 @@ Misc Menu
 */
 
 extern cvar_t pr_checkextension, r_replacemodels, gl_load24bit, cl_nopext, r_lerpmodels, r_lerpmove, 
-sys_throttle, r_particles, sv_nqplayerphysics, cl_nopred, cl_autodemo, cl_smartspawn, cl_bobbing, cl_onload;
+sys_throttle, r_particles, sv_nqplayerphysics, cl_nopred, cl_autodemo, cl_smartspawn, cl_bobbing, cl_onload,
+cl_pong, scr_hints;
 
 static enum extras_e
 {
@@ -8829,6 +9026,8 @@ static enum extras_e
 	EXTRAS_ITEMBOB,
 	EXTRAS_RESETCONFIG,
 	EXTRAS_STARTUP,
+	EXTRAS_PONG,
+	EXTRAS_HINTS,
 	EXTRAS_COUNT
 } extras_cursor;
 
@@ -8871,6 +9070,10 @@ static const char* M_Extras_GetItemText(int index) // Add this helper function
 		return "Reset Config";
 	case EXTRAS_STARTUP:
 		return "Start-up Screen";
+	case EXTRAS_PONG:
+		return "Quake Pong";
+	case EXTRAS_HINTS:
+		return "Paused Hints";
 	default:
 		q_snprintf(buffer, sizeof(buffer), "Unknown Item %d", index);
 		return buffer;
@@ -8986,6 +9189,12 @@ static void M_Extras_AdjustSliders (int dir)
 			else  // If it's a custom command, cycle back to menu
 				Cvar_Set("cl_onload", "menu");
 		}
+		break;
+	case EXTRAS_PONG: // Added Quake Pong toggle
+		Cvar_SetValueQuick(&cl_pong, !cl_pong.value);
+		break;
+	case EXTRAS_HINTS: // Added Paused Hints toggle
+		Cvar_SetValueQuick(&scr_hints, !scr_hints.value);
 		break;
 	case EXTRAS_ITEMS:	//not a real option
 		break;
@@ -9107,6 +9316,16 @@ void M_Extras_Draw(void)
 				value = va("cmd: %s", cl_onload.string);
 			else
 				value = cl_onload.string;
+			break;
+
+		case EXTRAS_PONG: // Added Quake Pong display
+			text = "        Quake Pong";
+			value = cl_pong.value ? "on" : "off";
+			break;
+
+		case EXTRAS_HINTS: // Added Paused Hints display
+			text = "      Paused Hints";
+			value = scr_hints.value ? "on" : "off";
 			break;
 
 		default:
