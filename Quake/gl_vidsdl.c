@@ -2829,7 +2829,7 @@ static void VID_MenuDraw (void)
 			break;
 
 		case VID_OPT_REFRESHRATE:
-			text = "      Refresh rate";
+			text = "      Refresh Rate";
 			value = va("%i", (int)vid_refreshrate.value);
 			break;
 
@@ -2838,19 +2838,19 @@ static void VID_MenuDraw (void)
 			switch (VID_Menu_CycleDisplayMode(false))
 			{
 			case DISPLAYMODE_FULLSCREEN:
-				value = "Fullscreen";
+				value = "fullscreen";
 				break;
 			case DISPLAYMODE_WINDOWED:
-				value = "Windowed";
+				value = "windowed";
 				break;
 			case DISPLAYMODE_BORDERLESS:
-				value = "Borderless";
+				value = "borderless";
 				break;
 			}
 			break;
 
 		case VID_OPT_VSYNC:
-			text = "     Vertical sync";
+			text = "     Vertical Sync";
 			if (gl_swap_control)
 				value = vid_vsync.value ? "on" : "off";
 			else
@@ -2864,11 +2864,11 @@ static void VID_MenuDraw (void)
 
 		case VID_OPT_TEST:
 			y += 8; //separate the test and apply items
-			text = "      Test changes";
+			text = "      Test Changes";
 			break;
 
 		case VID_OPT_APPLY:
-			text = "     Apply changes";
+			text = "     Apply Changes";
 			break;
 		}
 
