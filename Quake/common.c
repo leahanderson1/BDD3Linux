@@ -3657,6 +3657,7 @@ static void COM_Game_f (void)
 		//Kill the server
 		CL_Disconnect ();
 		Host_ShutdownServer(true);
+		Host_ClearMemory (); // woods -- clear allocated mem on game switches
 
 		//Write config file
 		//fixme -- writing configs without reloading when switching between many mods is SERIOUSLY dangerous. ignore if no 'exec default.cfg' commands were used?
