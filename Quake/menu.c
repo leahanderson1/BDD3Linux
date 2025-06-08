@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <sys/types.h>
 #else
 #include <unistd.h>
+#include <dirent.h>
 #endif
 
 void (*vid_menucmdfn)(void); //johnfitz
@@ -74,6 +75,7 @@ void M_Menu_Main_f (void);
 			void M_Menu_Crosshair_f (void);
 		void M_Menu_Console_f (void);
 		void M_Menu_Extras_f (void);
+		void M_Menu_ResetConfig_f(void); // woods #resetconfig
 	void M_Menu_Mods_f(void); // woods #modsmenu (iw)
 	void M_Menu_Demos_f (void); // woods #demosmenu
 	void M_Menu_Help_f (void);
@@ -105,6 +107,7 @@ void M_Main_Draw (void);
 		void M_Game_Draw (void);
 		void M_HUD_Draw (void);
 		void M_Extras_Draw (void);
+		void M_ResetConfig_Draw(void); // woods #resetconfig
 			void M_Crosshair_Draw (void);
 		void M_Console_Draw (void);
 	void M_Mods_Draw(void); // woods #modsmenu (iw)
@@ -137,6 +140,7 @@ void M_Main_Key (int key);
 		void M_Game_Key (int key);
 		void M_HUD_Key (int key);
 		void M_Extras_Key (int key);
+		void M_ResetConfig_Key(int key); // woods #resetconfig
 			void M_Crosshair_Key (int key);
 		void M_Console_Key (int key);
 	void M_Mods_Key (int key);
@@ -174,6 +178,7 @@ void M_Main_Key (int key);
 			void M_Crosshair_Mousemove (int cx, int cy);
 		void M_Console_Mousemove (int cx, int cy);
 		void M_Extras_Mousemove(int cx, int cy);
+		void M_ResetConfig_Mousemove(int cx, int cy); // woods #resetconfig
 	//void M_Gamepad_Mousemove (int cx, int cy);
 	void M_Mods_Mousemove(int cx, int cy);
 	void M_Demos_Mousemove(int cx, int cy);
@@ -3477,6 +3482,7 @@ enum
 	OPT_SPACE,       // Spacer
 	OPT_MENUSCALE,
 	OPT_CONSOLE,
+	OPT_RESETCONFIG,
 	OPTIONS_ITEMS
 };
 
@@ -3695,7 +3701,10 @@ void M_Options_Draw (void)
 			}
 			break;
 		case OPT_CONSOLE:
-			text = "          Goto console";
+			text = "          Goto Console";
+			break;
+		case OPT_RESETCONFIG:
+			text = "          Reset Config   ...";
 			break;
 		}
 
@@ -3761,7 +3770,9 @@ static const char* M_Options_GetItemText(int index)
 	case OPT_MENUSCALE:
 		return "            Menu Scale";
 	case OPT_CONSOLE:
-		return "          Goto console";
+		return "          Goto Console";
+	case OPT_RESETCONFIG:
+		return "         Reset Config   ...";
 
 	default:
 		return "";
@@ -3880,6 +3891,9 @@ void M_Options_Key (int k)
 		case OPT_CONSOLE:
 			m_state = m_none;
 			Con_ToggleConsole_f ();
+			break;
+		case OPT_RESETCONFIG:
+			M_Menu_ResetConfig_f();
 			break;
 		default:
 			M_AdjustSliders (1);
@@ -9534,6 +9548,531 @@ void M_Extras_Mousemove(int cx, int cy)
 
 /*
 ==================
+Reset Config Menu
+==================
+*/
+
+#define MAX_VIS_RESETCONFIG	17
+
+typedef struct
+{
+	char name[64];
+	char date[32];
+	qboolean active;
+} resetconfigitem_t;
+
+static struct
+{
+	menulist_t			list;
+	enum m_state_e		prev;
+	int					x, y, cols;
+	int					prev_cursor;
+	menuticker_t		ticker;
+	resetconfigitem_t* items;
+	qboolean			scrollbar_grab;
+	int* filtered_indices;
+	char				status_message[128]; // Add status message
+	double				status_time; // Time when status was set
+} resetconfigmenu;
+
+static void M_ResetConfig_Add(const char* name, const char* date)
+{
+	resetconfigitem_t tempConfig;
+	q_strlcpy(tempConfig.name, name, sizeof(tempConfig.name));
+	q_strlcpy(tempConfig.date, date, sizeof(tempConfig.date));
+	tempConfig.active = false;
+
+	// Find insertion position for date sorting (newest first)
+	int insertPos = 0;
+	int currentCount = VEC_SIZE(resetconfigmenu.items);
+
+	for (int i = 0; i < currentCount; i++)
+	{
+		if (q_sortdemos(date, resetconfigmenu.items[i].date) > 0) // If new date is newer
+		{
+			insertPos = i;
+			break;
+		}
+		insertPos = i + 1;
+	}
+
+	// Add the item using vector push
+	VEC_PUSH(resetconfigmenu.items, tempConfig);
+
+	// If we need to insert in the middle, shift items
+	if (insertPos < currentCount)
+	{
+		// Move the newly added item from the end to the correct position
+		resetconfigitem_t newItem = resetconfigmenu.items[currentCount]; // The item we just pushed
+
+		// Shift items to make room
+		for (int i = currentCount; i > insertPos; i--)
+		{
+			resetconfigmenu.items[i] = resetconfigmenu.items[i - 1];
+		}
+
+		// Insert at correct position
+		resetconfigmenu.items[insertPos] = newItem;
+	}
+}
+
+static void M_ResetConfig_Refilter(void)
+{
+	int i;
+	int itemCount = VEC_SIZE(resetconfigmenu.items);
+	VEC_CLEAR(resetconfigmenu.filtered_indices);
+
+	for (i = 0; i < itemCount; i++)
+	{
+		if (resetconfigmenu.list.search.len == 0 ||
+			q_strcasestr(resetconfigmenu.items[i].name, resetconfigmenu.list.search.text) ||
+			q_strcasestr(resetconfigmenu.items[i].date, resetconfigmenu.list.search.text))
+		{
+			VEC_PUSH(resetconfigmenu.filtered_indices, i);
+		}
+	}
+
+	resetconfigmenu.list.numitems = VEC_SIZE(resetconfigmenu.filtered_indices);
+
+	if (resetconfigmenu.list.cursor >= resetconfigmenu.list.numitems)
+		resetconfigmenu.list.cursor = resetconfigmenu.list.numitems - 1;
+
+	if (resetconfigmenu.list.cursor < 0 && resetconfigmenu.list.numitems > 0)
+		resetconfigmenu.list.cursor = 0;
+
+	M_List_CenterCursor(&resetconfigmenu.list);
+}
+
+static void M_ResetConfig_Init(void)
+{
+#ifdef _WIN32
+	WIN32_FIND_DATA fdat;
+	HANDLE fhnd;
+	char filestring[MAX_OSPATH];
+	char configname[64];
+	char configdate[32];
+	char sortdate[32]; // For converted date format
+
+	resetconfigmenu.list.viewsize = MAX_VIS_RESETCONFIG;
+	resetconfigmenu.list.cursor = -1;
+	resetconfigmenu.list.scroll = 0;
+	resetconfigmenu.scrollbar_grab = false;
+
+	// Clear vectors
+	VEC_CLEAR(resetconfigmenu.items);
+	VEC_CLEAR(resetconfigmenu.filtered_indices);
+
+	memset(&resetconfigmenu.list.search, 0, sizeof(resetconfigmenu.list.search));
+	resetconfigmenu.list.search.maxlen = 32;
+
+	// Clear status message
+	resetconfigmenu.status_message[0] = '\0';
+	resetconfigmenu.status_time = 0;
+
+	M_Ticker_Init(&resetconfigmenu.ticker);
+
+	// Add default config as first item (always at top)
+	M_ResetConfig_Add("default config", "9999-12-31 23:59:59"); // Future date to ensure it stays at top
+
+	// Search in backups folder for config-*.cfg files
+	q_snprintf(filestring, sizeof(filestring), "%s/backups/config-*.cfg", com_gamedir);
+	fhnd = FindFirstFile(filestring, &fdat);
+	if (fhnd != INVALID_HANDLE_VALUE)
+	{
+		do
+		{
+			q_strlcpy(configname, fdat.cFileName, sizeof(configname));
+
+			// Extract date from filename (config-MM-DD-YYYY.cfg)
+			if (strncmp(configname, "config-", 7) == 0)
+			{
+				char* datepart = configname + 7; // Skip "config-"
+				char* dotpos = strrchr(datepart, '.');
+				if (dotpos) *dotpos = '\0'; // Remove .cfg extension
+
+				q_strlcpy(configdate, datepart, sizeof(configdate));
+
+				// Convert MM-DD-YYYY to YYYY-MM-DD 00:00:00 for sorting
+				if (strlen(configdate) == 10) // MM-DD-YYYY format
+				{
+					char month[3], day[3], year[5];
+					if (sscanf(configdate, "%2s-%2s-%4s", month, day, year) == 3)
+					{
+						q_snprintf(sortdate, sizeof(sortdate), "%s-%s-%s 00:00:00", year, month, day);
+					}
+					else
+					{
+						q_strlcpy(sortdate, configdate, sizeof(sortdate));
+					}
+				}
+				else
+				{
+					q_strlcpy(sortdate, configdate, sizeof(sortdate));
+				}
+
+				M_ResetConfig_Add(configname, sortdate);
+			}
+		} while (FindNextFile(fhnd, &fdat));
+		FindClose(fhnd);
+	}
+#else
+	DIR* dir_p;
+	struct dirent* dir_t;
+	char filestring[MAX_OSPATH];
+	char configname[64];
+	char configdate[32];
+	char sortdate[32]; // For converted date format
+
+	resetconfigmenu.list.viewsize = MAX_VIS_RESETCONFIG;
+	resetconfigmenu.list.cursor = -1;
+	resetconfigmenu.list.scroll = 0;
+	resetconfigmenu.scrollbar_grab = false;
+
+	// Clear vectors
+	VEC_CLEAR(resetconfigmenu.items);
+	VEC_CLEAR(resetconfigmenu.filtered_indices);
+
+	memset(&resetconfigmenu.list.search, 0, sizeof(resetconfigmenu.list.search));
+	resetconfigmenu.list.search.maxlen = 32;
+
+	// Clear status message
+	resetconfigmenu.status_message[0] = '\0';
+	resetconfigmenu.status_time = 0;
+
+	M_Ticker_Init(&resetconfigmenu.ticker);
+
+	// Add default config as first item (always at top)
+	M_ResetConfig_Add("default config", "9999-12-31 23:59:59"); // Future date to ensure it stays at top
+
+	// Search in backups folder for config-*.cfg files
+	q_snprintf(filestring, sizeof(filestring), "%s/backups", com_gamedir);
+	dir_p = opendir(filestring);
+	if (dir_p != NULL)
+	{
+		while ((dir_t = readdir(dir_p)) != NULL)
+		{
+			if (q_strcasecmp(COM_FileGetExtension(dir_t->d_name), "cfg") != 0)
+				continue;
+
+			if (strncmp(dir_t->d_name, "config-", 7) != 0)
+				continue;
+
+			q_strlcpy(configname, dir_t->d_name, sizeof(configname));
+
+			// Extract date from filename (config-MM-DD-YYYY.cfg)
+			char* datepart = configname + 7; // Skip "config-"
+			char* dotpos = strrchr(datepart, '.');
+			if (dotpos) *dotpos = '\0'; // Remove .cfg extension
+
+			q_strlcpy(configdate, datepart, sizeof(configdate));
+
+			// Convert MM-DD-YYYY to YYYY-MM-DD 00:00:00 for sorting
+			if (strlen(configdate) == 10) // MM-DD-YYYY format
+			{
+				char month[3], day[3], year[5];
+				if (sscanf(configdate, "%2s-%2s-%4s", month, day, year) == 3)
+				{
+					q_snprintf(sortdate, sizeof(sortdate), "%s-%s-%s 00:00:00", year, month, day);
+				}
+				else
+				{
+					q_strlcpy(sortdate, configdate, sizeof(sortdate));
+				}
+			}
+			else
+			{
+				q_strlcpy(sortdate, configdate, sizeof(sortdate));
+			}
+
+			M_ResetConfig_Add(configname, sortdate);
+		}
+		closedir(dir_p);
+	}
+#endif
+
+	M_ResetConfig_Refilter();
+
+	if (resetconfigmenu.list.cursor == -1 && resetconfigmenu.list.numitems > 0)
+		resetconfigmenu.list.cursor = 0;
+
+	M_List_CenterCursor(&resetconfigmenu.list);
+}
+
+void M_Menu_ResetConfig_f(void)
+{
+	key_dest = key_menu;
+	resetconfigmenu.prev = m_state;
+	m_state = m_resetconfig;
+	m_entersound = true;
+	M_ResetConfig_Init();
+}
+
+void M_ResetConfig_Draw(void)
+{
+	int x, y, i, cols;
+	int firstvis, numvis;
+
+	x = 16;
+	y = 32;
+	cols = 36;
+
+	resetconfigmenu.x = x;
+	resetconfigmenu.y = y;
+	resetconfigmenu.cols = cols;
+
+	if (!keydown[K_MOUSE1]) // woods #mousemenu
+		resetconfigmenu.scrollbar_grab = false;
+
+	if (resetconfigmenu.prev_cursor != resetconfigmenu.list.cursor)
+	{
+		resetconfigmenu.prev_cursor = resetconfigmenu.list.cursor;
+		M_Ticker_Init(&resetconfigmenu.ticker);
+	}
+	else
+		M_Ticker_Update(&resetconfigmenu.ticker);
+
+	Draw_String(x, y - 28, "Reset Config");
+	M_DrawQuakeBar(x - 8, y - 16, cols + 2);
+
+	M_List_GetVisibleRange(&resetconfigmenu.list, &firstvis, &numvis);
+	for (i = 0; i < numvis; i++)
+	{
+		int idx = i + firstvis;
+		int config_idx = resetconfigmenu.filtered_indices[idx];
+		resetconfigitem_t* config_item = &resetconfigmenu.items[config_idx];
+		qboolean selected = (idx == resetconfigmenu.list.cursor);
+
+		int color = config_item->active ? 0 : 1;
+		int len = strlen(config_item->name);
+		int maxchars = (cols - 2);
+
+		if (resetconfigmenu.list.search.len > 0)
+		{
+			if (len <= maxchars)
+			{
+				// No scrolling needed, display with highlighting
+				M_PrintHighlight(x, y + i * 8, config_item->name, resetconfigmenu.list.search.text, resetconfigmenu.list.search.len);
+			}
+			else
+			{
+				// Scrolling needed, display with scrolling and highlighting
+				M_PrintHighlightScroll(x, y + i * 8, (cols - 2) * 8,
+					config_item->name, resetconfigmenu.list.search.text,
+					selected ? resetconfigmenu.ticker.scroll_time : 0.0);
+			}
+		}
+		else
+		{
+			if (len <= maxchars)
+			{
+				// No scrolling needed
+				if (color)
+					M_Print(x, y + i * 8, config_item->name);
+				else
+					M_PrintWhite(x, y + i * 8, config_item->name);
+			}
+			else
+			{
+				// Scrolling needed
+				M_PrintScroll(x, y + i * 8, (cols - 2) * 8,
+					config_item->name,
+					selected ? resetconfigmenu.ticker.scroll_time : 0.0,
+					color);
+			}
+		}
+
+		if (selected)
+			M_DrawCharacter(x - 8, y + i * 8, 12 + ((int)(realtime * 4) & 1));
+	}
+
+	if (M_List_GetOverflow(&resetconfigmenu.list) > 0)
+	{
+		M_List_DrawScrollbar(&resetconfigmenu.list, x + cols * 8 - 8, y);
+
+		if (resetconfigmenu.list.scroll > 0)
+			M_DrawEllipsisBar(x, y - 8, cols);
+		if (resetconfigmenu.list.scroll + resetconfigmenu.list.viewsize < resetconfigmenu.list.numitems)
+			M_DrawEllipsisBar(x, y + resetconfigmenu.list.viewsize * 8, cols);
+	}
+
+	if (resetconfigmenu.list.search.len > 0)
+	{
+		M_DrawTextBox(16, 180, 32, 1);
+		M_PrintHighlight(24, 188, resetconfigmenu.list.search.text,
+			resetconfigmenu.list.search.text,
+			resetconfigmenu.list.search.len);
+		int cursor_x = 24 + 8 * resetconfigmenu.list.search.len;
+		if (resetconfigmenu.list.numitems == 0)
+			M_DrawCharacter(cursor_x, 188, 11 ^ 128);
+		else
+			M_DrawCharacter(cursor_x, 188, 10 + ((int)(realtime * 4) & 1));
+	}
+
+	// Display status message if recent (show for 3 seconds)
+	if (resetconfigmenu.status_message[0] && (realtime - resetconfigmenu.status_time) < 3.0)
+	{
+		int status_y = y + resetconfigmenu.list.viewsize * 8 + 16;
+		M_PrintWhite(x, status_y, resetconfigmenu.status_message);
+	}
+}
+
+qboolean M_ResetConfig_Match(int index, char initial)
+{
+	int config_idx = resetconfigmenu.filtered_indices[index];
+	return q_tolower(resetconfigmenu.items[config_idx].name[0]) == initial;
+}
+
+void M_ResetConfig_Key(int key)
+{
+	int x, y; // woods #mousemenu
+
+	if (resetconfigmenu.scrollbar_grab)
+	{
+		switch (key)
+		{
+		case K_ESCAPE:
+		case K_BBUTTON:
+		case K_MOUSE4:
+		case K_MOUSE2:
+			resetconfigmenu.scrollbar_grab = false;
+			break;
+		}
+		return;
+	}
+
+	// Handle Ctrl+U or Ctrl+Backspace first
+	if (keydown[K_CTRL])
+	{
+		if ((key == 'u' || key == 'U') && resetconfigmenu.list.search.len > 0)
+		{
+			resetconfigmenu.list.search.len = 0;
+			resetconfigmenu.list.search.text[0] = 0;
+			M_ResetConfig_Refilter();
+			return;
+		}
+		else if (key == K_BACKSPACE && resetconfigmenu.list.search.len > 0)
+		{
+			M_DeletePrevWord(&resetconfigmenu.list.search);
+			M_ResetConfig_Refilter();
+			return;
+		}
+	}
+
+	if (M_List_Key(&resetconfigmenu.list, key))
+		return;
+
+	if (M_List_CycleMatch(&resetconfigmenu.list, key, M_ResetConfig_Match))
+		return;
+
+	if (M_Ticker_Key(&resetconfigmenu.ticker, key))
+		return;
+
+	switch (key)
+	{
+	case K_ESCAPE:
+	case K_BBUTTON:
+	case K_MOUSE4: // woods #mousemenu
+	case K_MOUSE2:
+		if (resetconfigmenu.prev == m_options)
+			M_Menu_Options_f();
+		else
+			M_Menu_Main_f();
+		break;
+
+	case K_ENTER:
+	case K_KP_ENTER:
+	case K_ABUTTON:
+	enter:
+		if (resetconfigmenu.list.numitems > 0 && resetconfigmenu.list.cursor >= 0)
+		{
+			int config_idx = resetconfigmenu.filtered_indices[resetconfigmenu.list.cursor];
+			resetconfigitem_t* config_item = &resetconfigmenu.items[config_idx];
+
+			// Check if this is the default config option
+			if (!strcmp(config_item->name, "default config"))
+			{
+				if (SCR_ModalMessage("This will reset all controls\n"
+					"and stored vars. Continue? (^my^m/^mn^m)\n", 15.0f))
+				{
+					Cbuf_AddText("resetcfg\n");
+					Cbuf_AddText("exec default.cfg\n");
+
+					// Set status message
+					q_strlcpy(resetconfigmenu.status_message, "reset to default config", sizeof(resetconfigmenu.status_message));
+					resetconfigmenu.status_time = realtime;
+				}
+			}
+			else
+			{
+				// Execute the config file
+				char exec_cmd[256];
+				q_snprintf(exec_cmd, sizeof(exec_cmd), "exec backups/%s.cfg\n", config_item->name);
+				Cbuf_AddText(exec_cmd);
+
+				// Set status message
+				q_snprintf(resetconfigmenu.status_message, sizeof(resetconfigmenu.status_message),
+					"loaded config %s", config_item->name);
+				resetconfigmenu.status_time = realtime;
+			}
+		}
+		break;
+
+	case K_MOUSE1: // woods #mousemenu
+		x = m_mousex - resetconfigmenu.x - (resetconfigmenu.cols - 1) * 8;
+		y = m_mousey - resetconfigmenu.y;
+		if (x < -8 || !M_List_UseScrollbar(&resetconfigmenu.list, y))
+			goto enter;
+		resetconfigmenu.scrollbar_grab = true;
+		M_ResetConfig_Mousemove(m_mousex, m_mousey);
+
+	case K_BACKSPACE:
+		if (resetconfigmenu.list.search.len > 0)
+		{
+			resetconfigmenu.list.search.text[--resetconfigmenu.list.search.len] = 0;
+			M_ResetConfig_Refilter();
+		}
+		break;
+
+	default:
+		break;
+	}
+}
+void M_ResetConfig_Char(int key)
+{
+	if (resetconfigmenu.list.search.len < resetconfigmenu.list.search.maxlen - 1 && key >= 32 && key < 127)
+	{
+		resetconfigmenu.list.search.text[resetconfigmenu.list.search.len++] = key;
+		resetconfigmenu.list.search.text[resetconfigmenu.list.search.len] = 0;
+		M_ResetConfig_Refilter();
+	}
+}
+
+qboolean M_ResetConfig_TextEntry(void)
+{
+	return true; // Always allow text entry for search
+}
+
+
+void M_ResetConfig_Mousemove(int cx, int cy) // woods #mousemenu
+{
+	cy -= resetconfigmenu.y;
+
+	if (resetconfigmenu.scrollbar_grab)
+	{
+		if (!keydown[K_MOUSE1])
+		{
+			resetconfigmenu.scrollbar_grab = false;
+			return;
+		}
+		M_List_UseScrollbar(&resetconfigmenu.list, cy);
+		// Note: no return, we also update the cursor
+	}
+
+	M_List_Mousemove(&resetconfigmenu.list, cy);
+}
+
+/*
+==================
 Video Menu
 ==================
 */
@@ -13204,6 +13743,7 @@ static struct
 	{"menu_crosshair", M_Menu_Crosshair_f},
 	{"menu_console", M_Menu_HUD_f},
 	{"menu_misc", M_Menu_Extras_f},
+	{"menu_config", M_Menu_ResetConfig_f},
 	{"menu_video", M_Menu_Video_f},
 	{"menu_graphics", M_Menu_Graphics_f},
 	{"help", M_Menu_Help_f},
@@ -13491,6 +14031,10 @@ void M_Draw (void)
 		M_Extras_Draw ();
 		break;
 
+	case m_resetconfig: // woods #resetconfig
+		M_ResetConfig_Draw();
+		break;
+
 	case m_video:
 		M_Video_Draw ();
 		break;
@@ -13644,6 +14188,10 @@ void M_Keydown (int key)
 
 	case m_extras:
 		M_Extras_Key (key);
+		return;
+
+	case m_resetconfig: // woods #resetconfig
+		M_ResetConfig_Key(key);
 		return;
 
 	case m_video:
@@ -13824,6 +14372,10 @@ void M_Mousemove(int x, int y) // woods #mousemenu
 		M_Extras_Mousemove(x, y);
 		return;
 
+	case m_resetconfig: // woods #resetconfig
+		M_ResetConfig_Mousemove(x, y);
+		break;
+
 	case m_mods:
 		M_Mods_Mousemove(x, y);
 		return;
@@ -13878,6 +14430,9 @@ void M_Charinput (int key)
 	case m_lanconfig:
 		M_LanConfig_Char (key);
 		return;
+	case m_resetconfig:
+		M_ResetConfig_Char(key);
+		return;
 	default:
 		return;
 	}
@@ -13896,6 +14451,8 @@ qboolean M_TextEntry (void)
 		return M_Quit_TextEntry ();
 	case m_lanconfig:
 		return M_LanConfig_TextEntry ();
+	case m_resetconfig:
+		return M_ResetConfig_TextEntry();
 	default:
 		return false;
 	}

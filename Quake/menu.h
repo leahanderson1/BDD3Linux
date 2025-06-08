@@ -56,7 +56,8 @@ enum m_state_e {
 	m_history,
 	m_bookmarks, // woods #bookmarksmenu
 	m_bookmarks_edit, // woods #bookmarksmenu
-	m_namemaker // woods #namemaker
+	m_namemaker, // woods #namemaker
+	m_resetconfig
 };
 
 extern enum m_state_e m_state;
