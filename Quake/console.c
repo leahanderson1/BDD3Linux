@@ -664,6 +664,13 @@ static void Con_UpdateLastchatCounter(void) // woods #like
 	}
 }
 
+Uint32 RideDelayCallback(Uint32 interval, void* param) // runequake changelevel hack
+{
+	strncpy(cl.observer, "y", sizeof(cl.observer));
+	cl.modtype = 6;
+	return 0; // 0 means the timer won't repeat
+}
+
 /*
 ================
 Con_Print
@@ -692,22 +699,44 @@ static void Con_Print (const char *txt)
 			if (!strcmp(txt, "Match unpaused\n") && !cls.demoplayback && !cls.demorecording)
 				Cmd_ExecuteString("record\n", src_command);
 
+		if (cl.time < 600 && strstr(txt, "Now riding "))
+		{
+			SDL_AddTimer(2000, RideDelayCallback, NULL);
+		}
+
 		if (cl.modtype == 6) // runequake observer detection
 		{
-			if (!strcmp(txt, "Now riding "))
+			if (strstr(txt, "Now riding "))
 				strncpy(cl.observer, "y", sizeof(cl.observer));
 
-			if (!strcmp(txt, cl_name.string)) 
+			char name_to_check[32];
+			if (cl_contentfilter.value == 2) {
+				WordFilter_Check(cl_name.string, name_to_check, sizeof(name_to_check));
+			}
+			else {
+				Q_strncpy(name_to_check, cl_name.string, sizeof(name_to_check) - 1);
+				name_to_check[sizeof(name_to_check) - 1] = '\0';
+			}
+
+			if (!strcmp(txt, name_to_check))
 				firstCheckPassed = true;
 			else if (firstCheckPassed && !strcmp(txt, " joined the game\n"))
 			{
 				strncpy(cl.observer, "n", sizeof(cl.observer));
 				firstCheckPassed = false;  // Reset flag after the condition is met
 			}
-			else if (firstCheckPassed) // The next text was not " joined the game\n", reset the flag
+			else if (firstCheckPassed && !strcmp(txt, " became an observer\n"))
+			{
+				strncpy(cl.observer, "y", sizeof(cl.observer));
+				firstCheckPassed = false;  // Reset flag after the condition is met
+			}
+			else if (firstCheckPassed) // The next text was not expected, reset the flag
 				firstCheckPassed = false;
 
 			if (q_strcasestr(txt, "]observer"))
+				strncpy(cl.observer, "y", sizeof(cl.observer));
+
+			if (q_strcasestr(txt, "Now riding"))
 				strncpy(cl.observer, "y", sizeof(cl.observer));
 		}
 
