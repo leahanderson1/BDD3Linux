@@ -658,6 +658,35 @@ void Sbar_SortFrags_TeamOrder(qboolean sort_ascending)
 		}
 	}
 
+	/* 5.  Append spectators at the bottom */
+	int spectators[MAX_SCOREBOARD];
+	int nspectators = 0;
+	
+	// Collect all spectators
+	for (int i = 0; i < cl.maxclients && nspectators < MAX_SCOREBOARD; ++i) {
+		scoreboard_t* s = &cl.scores[i];
+		if (!s->name[0] || !s->spectator)
+			continue;
+		
+		spectators[nspectators++] = i;
+	}
+	
+	// Sort spectators by frags
+	if (sort_ascending) {
+		qsort(spectators, nspectators, sizeof(int), cmp_player_asc);
+	}
+	else {
+		qsort(spectators, nspectators, sizeof(int), cmp_player_desc);
+	}
+	
+	// Append sorted spectators to fragsort
+	int copy = nspectators;
+	if (n + copy > MAX_SCOREBOARD)
+		copy = MAX_SCOREBOARD - n;
+	
+	memcpy(&fragsort[n], spectators, copy * sizeof(int));
+	n += copy;
+
 	scoreboardlines = n;
 }
 
