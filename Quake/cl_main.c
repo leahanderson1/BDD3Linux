@@ -1364,9 +1364,16 @@ int checkWebsite (void* ptr)  // ping the potential websites in advance
 		return -1;
 	}
 
-	curl_easy_setopt(curl, CURLOPT_URL, data->url);
-	curl_easy_setopt(curl, CURLOPT_NOBODY, 1); // HEAD request
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
+	char fullurl[256];
+	if (!strstr(data->url, "://"))
+		q_snprintf(fullurl, sizeof(fullurl), "https://%s/", data->url);
+	else
+		q_strlcpy(fullurl, data->url, sizeof(fullurl));
+
+	curl_easy_setopt(curl, CURLOPT_URL, fullurl);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); // HEAD request
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 
 	CURLcode res = curl_easy_perform(curl);
 	if (res == CURLE_OK)
@@ -1383,7 +1390,7 @@ int checkWebsite (void* ptr)  // ping the potential websites in advance
 	}
 	else
 	{
-		Con_DPrintf("cl_web_download_url %s is not responsive", data->url);
+		Con_DPrintf("cl_web_download_url %s is not responsive: %s\n", data->url, curl_easy_strerror(res));
 
 		switch (data->web)
 		{
