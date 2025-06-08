@@ -1714,6 +1714,11 @@ static int RSceneCache_Thread(void *ctx)
 									continue;	//ignore any buggy degenerate ones.
 								if ((unsigned)(surf->lightmaptexturenum+1) >= cache->lightmaps)
 									continue;	//wtf
+								if (!surf->texinfo) { // material sanity – guard against NULL or out-of-range
+									Con_DPrintf("RSceneCache: surface %ld has NULL texinfo – skipping\n",
+										(long)(surf - cache->worldmodel->surfaces));
+									continue;
+								}
 								if ((unsigned int)surf->texinfo->materialidx >= cache->numtextures)
 									continue;	//should have been sanitised at load.
 								numidx = (surf->numedges-2)*3;

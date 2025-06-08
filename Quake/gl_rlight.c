@@ -200,7 +200,7 @@ void R_MarkLights (dlight_t *light, vec3_t lightorg, int framecount, int num, mn
 	mplane_t	*splitplane;
 	msurface_t	*surf;
 	vec3_t		impact;
-	float		dist, l, maxdist;
+	float		dist, facedist, l, maxdist;
 	unsigned int i;
 	int			 j, s, t;
 
@@ -234,29 +234,46 @@ start:
 		return;
 	}
 
-// mark the polygons
-	surf = cl.worldmodel->surfaces + node->firstsurface;
-	for (i=0 ; i<node->numsurfaces ; i++, surf++)
+	if (node->firstsurface >= 0 &&
+		node->firstsurface + node->numsurfaces <= cl.worldmodel->numsurfaces)
 	{
-		for (j=0 ; j<3 ; j++)
-			impact[j] = lightorg[j] - surf->plane->normal[j]*dist;
-		// clamp center of light to corner and check brightness
-		l = DotProduct (impact, surf->lmvecs[0]) + surf->lmvecs[0][3];
-		s = l;if (s < 0) s = 0;else if (s > surf->extents[0]) s = surf->extents[0];
-		s = l - s;
-		l = DotProduct (impact, surf->lmvecs[1]) + surf->lmvecs[1][3];
-		t = l;if (t < 0) t = 0;else if (t > surf->extents[1]) t = surf->extents[1];
-		t = l - t;
-		// compare to minimum light
-		if ((s*s+t*t+dist*dist) < maxdist)
+
+		// mark the polygons
+		surf = cl.worldmodel->surfaces + node->firstsurface;
+		for (i=0 ; i<node->numsurfaces ; i++, surf++)
 		{
-			if (surf->dlightframe != framecount) // not dynamic until now
+			if (!surf->plane
+				|| surf->plane < cl.worldmodel->planes
+				|| surf->plane >= cl.worldmodel->planes + cl.worldmodel->numplanes)
 			{
-				surf->dlightbits[num >> 5] = 1U << (num & 31);
-				surf->dlightframe = framecount;
+				Con_DPrintf("R_MarkLights: NULL / out-of-range plane on surface %ld – skipping\n",
+					(long)(surf - cl.worldmodel->surfaces));
+				continue;           /* skip this surface, process the rest */
 			}
-			else // already dynamic
-				surf->dlightbits[num >> 5] |= 1U << (num & 31);
+			
+			facedist = DotProduct(lightorg, surf->plane->normal)
+				- surf->plane->dist;
+			
+			for (j=0 ; j<3 ; j++)
+				impact[j] = lightorg[j] - surf->plane->normal[j]*facedist;
+			// clamp center of light to corner and check brightness
+			l = DotProduct (impact, surf->lmvecs[0]) + surf->lmvecs[0][3];
+			s = l;if (s < 0) s = 0;else if (s > surf->extents[0]) s = surf->extents[0];
+			s = l - s;
+			l = DotProduct (impact, surf->lmvecs[1]) + surf->lmvecs[1][3];
+			t = l;if (t < 0) t = 0;else if (t > surf->extents[1]) t = surf->extents[1];
+			t = l - t;
+			// compare to minimum light
+			if ((s*s+t*t+facedist*facedist) < maxdist)
+			{
+				if (surf->dlightframe != framecount) // not dynamic until now
+				{
+					surf->dlightbits[num >> 5] = 1U << (num & 31);
+					surf->dlightframe = framecount;
+				}
+				else // already dynamic
+					surf->dlightbits[num >> 5] |= 1U << (num & 31);
+			}
 		}
 	}
 
