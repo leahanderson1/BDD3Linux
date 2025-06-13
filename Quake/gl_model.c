@@ -851,10 +851,26 @@ static void Mod_LoadTextures (lump_t *l)
 
 		mipend = m->dataofs[i];
 
-		if (!tx->name[0]) // woods
+		if (!tx->name[0]) // woods (aerowalk.bsp)
 		{
 			q_snprintf(tx->name, sizeof(tx->name), "unnamed%d", i);
 			Con_DPrintf ("unnamed texture in %s, renaming to %s\n", loadmodel->name, tx->name);
+		}
+
+		if (tx->name[0] && strchr(tx->name + 1, '*')) // woods (oldcrat.bsp)
+		{
+			char safename[sizeof(tx->name)];
+
+			q_strlcpy(safename, tx->name, sizeof(safename));
+
+			for (size_t k = 1; safename[k]; ++k)
+				if (safename[k] == '*')
+					safename[k] = '#';
+
+			Con_DPrintf("texture \"%s\" in %s renamed to \"%s\" to avoid wildcard\n",
+				tx->name, loadmodel->name, safename);
+
+			q_strlcpy(tx->name, safename, sizeof(tx->name));
 		}
 
 		//johnfitz -- lots of changes
