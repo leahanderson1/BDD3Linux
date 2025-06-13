@@ -2328,7 +2328,7 @@ static const char* GetSaveMapName(const char* filepath)
 	}
 
 	// Read map name
-	if (fscanf(f, "%79s\n", mapname) != 1) {
+	if (fscanf(f, "%63s\n", mapname) != 1) {
 		fclose(f);
 		return mapname;
 	}
