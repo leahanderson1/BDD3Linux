@@ -730,6 +730,11 @@ static void Con_Print (const char *txt)
 				strncpy(cl.observer, "y", sizeof(cl.observer));
 				firstCheckPassed = false;  // Reset flag after the condition is met
 			}
+			else if (firstCheckPassed && !strcmp(txt, " is the new challenger\n")) // ra
+			{
+				strncpy(cl.observer, "n", sizeof(cl.observer));
+				firstCheckPassed = false;  // Reset flag after the condition is met
+			}
 			else if (firstCheckPassed) // The next text was not expected, reset the flag
 				firstCheckPassed = false;
 
