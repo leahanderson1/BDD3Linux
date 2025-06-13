@@ -2124,7 +2124,7 @@ void SCR_ShowObsFrags(void)
 	if (scr_viewsize.value >= 120)
 		return;
 
-	if (cl.modtype == 1 && !cl.notobserver && scr_obsitems.value)
+	if ((!cl.notobserver && scr_obsitems.value) || (cls.demoplayback && scr_obsitems.value))
 	{
 		if (COM_FileExists("gfx/ibar2.lmp", NULL))
 			weapon_icons = Draw_CachePic("gfx/ibar2.lmp");
@@ -2225,8 +2225,7 @@ void SCR_ShowObsFrags(void)
 
 				M_PrintWhite(x + 50, y, shortname);
 
-				// Only draw items if cl.modtype == 1 and !cl.notobserver
-				if (cl.modtype == 1 && !cl.notobserver && scr_obsitems.value)
+				if ((!cl.notobserver && scr_obsitems.value) || (cls.demoplayback && scr_obsitems.value))
 				{
 					// Calculate name width for icon placement
 					int nameWidth = strlen(shortname) * 8;
@@ -2699,7 +2698,7 @@ static float GetLocalVelocity(void)
 
 static float GetSpeedValue(void)
 {
-	if (cl.modtype == 1 && !cl.notobserver &&
+	if (!cl.notobserver &&
 		cl.viewentity - 1 >= 0 && cl.viewentity - 1 < MAX_SCOREBOARD)
 	{
 		int new_speed = (int)cl.scores[cl.viewentity - 1].tinfo.speed;
