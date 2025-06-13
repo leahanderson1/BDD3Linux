@@ -235,7 +235,7 @@ start:
 	}
 
 	if (node->firstsurface >= 0 &&
-		node->firstsurface + node->numsurfaces <= cl.worldmodel->numsurfaces)
+		node->firstsurface + node->numsurfaces <= (unsigned int)cl.worldmodel->numsurfaces)
 	{
 
 		// mark the polygons
@@ -246,7 +246,7 @@ start:
 				|| surf->plane < cl.worldmodel->planes
 				|| surf->plane >= cl.worldmodel->planes + cl.worldmodel->numplanes)
 			{
-				Con_DPrintf("R_MarkLights: NULL / out-of-range plane on surface %ld – skipping\n",
+				Con_DPrintf("R_MarkLights: NULL / out-of-range plane on surface %ld - skipping\n",
 					(long)(surf - cl.worldmodel->surfaces));
 				continue;           /* skip this surface, process the rest */
 			}
