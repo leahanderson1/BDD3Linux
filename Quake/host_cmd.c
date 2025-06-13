@@ -2312,7 +2312,22 @@ static void Host_Map_f (void)
 		}
 		else if (cls.state == ca_connected)
 		{
-			Con_Printf ("Current map: %s ( %s )\n", cl.levelname, cl.mapname);
+			char   mapPath[MAX_OSPATH];
+			int    h;
+			qofs_t fsize = -1;
+
+			q_snprintf(mapPath, sizeof(mapPath), "maps/%s.bsp", cl.mapname);
+			fsize = COM_OpenFile(mapPath, &h, NULL);
+			if (h != -1)
+				COM_CloseFile(h);
+
+			if (fsize > 0)
+				Con_Printf("Current map: %s ( %s ) - ^m%.1f MB^m\n",
+					cl.levelname,
+					cl.mapname,
+					(float)fsize / (1024.0f * 1024.0f));
+			else
+				Con_Printf("Current map: %s ( %s )\n", cl.levelname, cl.mapname);
 		}
 		else
 		{
