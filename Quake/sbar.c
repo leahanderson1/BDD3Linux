@@ -637,18 +637,14 @@ void Sbar_SortFrags_TeamOrder(qboolean sort_ascending)
 	/* 4.  Append lone-wolves (color 0 or -99) and spectators */
 	for (int i = 0; i < cl.maxclients && n < MAX_SCOREBOARD; ++i) {
 		scoreboard_t* s = &cl.scores[i];
-		if (!s->name[0])
+		if (!s->name[0] || s->spectator)
 			continue;
 
-		// Handle spectators - set their frags to -99 and include them here
-		if (s->spectator) {
-			s->frags = -99;
-		}
 		// Handle non-spectator players with -99 frags (observers)
-		else if (s->frags == -99) {
+		if (s->frags == -99) {
 			// Include them regardless of team color
 		}
-		// Skip non-spectators that are on teams
+		// Handle lone wolves (non-team players)
 		else {
 		int col = s->pants.basic;
 		if (col != COLOR_NONE && col != COLOR_FREE)
@@ -671,6 +667,28 @@ void Sbar_SortFrags_TeamOrder(qboolean sort_ascending)
 			fragsort[pos] = i;
 			++n;
 		}
+	}
+
+	// Then, handle spectators - always at bottom for descending, top for ascending
+	for (int i = 0; i < cl.maxclients && n < MAX_SCOREBOARD; ++i) {
+		scoreboard_t* s = &cl.scores[i];
+		if (!s->name[0] || !s->spectator)
+			continue;
+
+		// Set spectator frags to -99 and color to 0
+		s->frags = -99;
+		s->pants.basic = 0;  // COLOR_NONE
+
+		if (sort_ascending) {
+			// For ascending order, add spectators at the beginning
+			memmove(&fragsort[1], &fragsort[0], n * sizeof(int));
+			fragsort[0] = i;
+		}
+		else {
+			// For descending order, add spectators at the end
+			fragsort[n] = i;
+		}
+		++n;
 	}
 
 	scoreboardlines = n;
