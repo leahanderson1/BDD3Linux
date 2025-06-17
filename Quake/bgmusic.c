@@ -338,7 +338,12 @@ void BGM_PlayCDtrack (byte track, qboolean looping)
 		handler = handler->next;
 	}
 	if (ext == NULL)
-		Con_Printf("Couldn't find a cdrip for track %d\n", (int)track);
+	{
+		if (track != 0) // woods
+			Con_Printf("Couldn't find a cdrip for track %d\n", (int)track);
+		else
+			Con_DPrintf("Skipped invalid track 0 request\n");
+	}
 	else
 	{
 		q_snprintf(tmp, sizeof(tmp), "%s/track%02d.%s",
