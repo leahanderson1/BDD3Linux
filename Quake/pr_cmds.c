@@ -1868,6 +1868,19 @@ void PR_spawnfunc_misc_model(edict_t *self)
 	PF_sv_makestatic();
 }
 
+static void PF_unlockachievement(void) {
+	if (Cvar_VariableValue("SV_Cheats") != 0) {
+		return;
+	}
+	const char* name = G_STRING(OFS_PARM0);
+	Con_Printf("unlock_achievement %s\n", name);
+}
+static void PF_updatestat(void) {
+	const char* name = G_STRING(OFS_PARM0);
+	int value = G_INT(OFS_PARM1);
+	Con_Printf("update_stat %s %i\n", name, value);
+}
+
 const builtin_t pr_ssqcbuiltins[] =
 {
 	PF_Fixme,
@@ -1898,29 +1911,29 @@ const builtin_t pr_ssqcbuiltins[] =
 	PF_dprint,		// void(string s) dprint		= #25
 	PF_ftos,		// void(string s) ftos			= #26
 	PF_vtos,		// void(string s) vtos			= #27
-	PF_coredump,
-	PF_traceon,
-	PF_traceoff,
-	PF_eprint,		// void(entity e) debug print an entire entity
-	PF_walkmove,		// float(float yaw, float dist) walkmove
-	PF_Fixme,		// float(float yaw, float dist) walkmove
-	PF_droptofloor,
-	PF_sv_lightstyle,
-	PF_rint,
-	PF_floor,
-	PF_ceil,
-	PF_Fixme,
-	PF_checkbottom,
-	PF_pointcontents,
-	PF_Fixme,
-	PF_fabs,
-	PF_aim,
-	PF_cvar,
-	PF_localcmd,
-	PF_nextent,
-	PF_particle,
-	PF_changeyaw,
-	PF_Fixme,
+	PF_coredump, // 28
+	PF_traceon, // 29
+	PF_traceoff, // 30
+	PF_eprint,		// void(entity e) debug print an entire entity 31
+	PF_walkmove,		// float(float yaw, float dist) walkmove 32
+	PF_Fixme,		// float(float yaw, float dist) walkmove 33
+	PF_droptofloor,  // 34
+	PF_sv_lightstyle, // 35 
+	PF_rint, // 36
+	PF_floor, // 37
+	PF_ceil, //38
+	PF_Fixme,//39
+	PF_checkbottom, // 40
+	PF_pointcontents, //41
+	PF_Fixme, //42
+	PF_fabs, //43
+	PF_aim,// 44
+	PF_cvar, // 45
+	PF_localcmd, //46
+	PF_nextent, //47
+	PF_particle,//48
+	PF_changeyaw,//49
+	PF_unlockachievement, // #50
 	PF_vectoangles,
 
 	PF_sv_WriteByte,
@@ -1945,7 +1958,7 @@ const builtin_t pr_ssqcbuiltins[] =
 	PF_sv_makestatic,
 
 	PF_sv_changelevel,
-	PF_Fixme,
+	PF_updatestat,  // #71
 
 	PF_cvar_set,
 	PF_centerprint,
