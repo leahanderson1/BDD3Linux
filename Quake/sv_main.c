@@ -3864,7 +3864,7 @@ void SV_SpawnServer (const char *server)
 			strcpy(sv.name, sv_defaultmap.string);
 			q_snprintf(sv.modelname, sizeof(sv.modelname), "maps/%s.bsp", sv_defaultmap.string);
 			qcvm->worldmodel = Mod_ForName(sv.modelname, false);
-			Con_Printf("attemping sv_defaultmap ^m%s.bsp^m\n", sv_defaultmap.string);
+			Con_Printf("attempting sv_defaultmap ^m%s.bsp^m\n", sv_defaultmap.string);
 		}
 		else
 		{

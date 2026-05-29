@@ -34,6 +34,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <dirent.h>
 #endif
 
+qboolean horde_map = false; // bdd3
+
 void (*vid_menucmdfn)(void); //johnfitz
 void (*vid_menudrawfn)(void);
 void (*vid_menukeyfn)(int key);
@@ -42,10 +44,11 @@ void (*vid_menumousefn)(int cx, int cy); // woods #mousemenu
 enum m_state_e m_state;
 extern qboolean	keydown[256]; // woods #modsmenu (iw)
 int m_mousex, m_mousey; // woods #mousemenu
-
+qboolean m_skill_from_newgame;
 const char* ResolveHostname(const char* hostname); // woods #serversmenu
 extern qboolean Valid_IP(const char* ip_str); // woods #serversmenu
 extern qboolean Valid_Domain(const char* domain_str); // woods #serversmenu
+
 
 void M_Menu_Main_f (void);
 	void M_Menu_SinglePlayer_f (void);
@@ -184,6 +187,17 @@ void M_Main_Key (int key);
 	void M_Demos_Mousemove(int cx, int cy);
 	//void M_Help_Mousemove (int cx, int cy);
 	//void M_Quit_Mousemove (int cx, int cy);
+// ===== Horde =====
+void M_Menu_Horde_f(void);
+void M_Horde_Draw(void);
+void M_Horde_Key(int key);
+void M_Horde_Mousemove(int cx, int cy);
+
+// ===== Campaign =====
+void M_Menu_Campaign_f(void);
+void M_Campaign_Draw(void);
+void M_Campaign_Key(int key);
+void M_Campaign_Mousemove(int cx, int cy);
 
 qboolean	m_entersound;		// play after drawing a frame, so caching
 								// won't disrupt the sound
@@ -1493,8 +1507,7 @@ Singleplayer Menu
 
 qboolean m_singleplayer_showlevels;
 int	m_singleplayer_cursor;
-#define	SINGLEPLAYER_ITEMS	(3 + m_singleplayer_showlevels)
-
+#define	SINGLEPLAYER_ITEMS	(5 + m_singleplayer_showlevels + 1)
 
 void M_Menu_SinglePlayer_f (void)
 {
@@ -1508,22 +1521,37 @@ void M_Menu_SinglePlayer_f (void)
 	IN_UpdateGrabs();
 }
 
-
-void M_SinglePlayer_Draw (void)
+void M_SinglePlayer_Draw(void)
 {
-	int		f;
-	qpic_t	*p;
+	M_DrawTransPic(16, 4, Draw_CachePic("gfx/qplaque.lmp"));
 
-	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
-	p = Draw_CachePic ("gfx/ttl_sgl.lmp");
-	M_DrawPic ( (320-p->width)/2, 4, p);
-	M_DrawTransPic (72, 32, Draw_CachePic ("gfx/sp_menu.lmp") );
-	if (m_singleplayer_showlevels)
-		M_DrawTransPic(72, 92, Draw_CachePic("gfx/sp_maps.lmp"));
+	const char* title = LOC_GetString("$menu_single_player");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
-	f = (int)(realtime * 10)%6;
+	const double scale = 1.5;
+	const double invScale = 1.0 / scale;
 
-	M_DrawTransPic (54, 32 + m_singleplayer_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 ) ) );
+	glPushMatrix();
+	glScalef(scale, scale, scale);
+
+	int x = 72;
+	int y = 32;
+	M_Print(x * invScale, y * invScale, LOC_GetString("$menu_new_game")); y += 20;
+	M_Print(x * invScale, y * invScale, LOC_GetString("$menu_load_game")); y += 20;
+	M_Print(x * invScale, y * invScale, LOC_GetString("$menu_load_quicksave")); y += 20;
+	M_Print(x * invScale, y * invScale, LOC_GetString("$menu_save_game")); y += 20;
+	M_Print(x * invScale, y * invScale, LOC_GetString("$menu_campaign")); y += 20;
+	if (m_singleplayer_showlevels) {
+		M_Print(x * invScale, y * invScale, LOC_GetString("$menu_levels")); y += 20;
+	}
+	M_Print(x * invScale, y * invScale, LOC_GetString("$menu_horde")); y += 20;
+
+	glPopMatrix();
+
+	int cursor, f;
+	f = (int)(realtime * 10) % 6;
+	cursor = m_singleplayer_cursor;
+	M_DrawTransPic(44, 24 + cursor * 20, Draw_CachePic(va("gfx/menudot%i.lmp", f + 1)));
 }
 
 static double sp_lastkey_time;  // For single player menu
@@ -1561,22 +1589,26 @@ void M_SinglePlayer_Key (int key)
 		}
 		else
 		{
-			sp_lastkey_time = realtime;
-			sp_key_was_l = true;
-			m_singleplayer_cursor = 1;  // Load Game
-			S_LocalSound("misc/menu1.wav");
+			if (!horde_map) { // bdd3
+				sp_lastkey_time = realtime;
+				sp_key_was_l = true;
+				m_singleplayer_cursor = 1;  // Load Game
+				S_LocalSound("misc/menu1.wav");
+			}
 		}
 		break;
 
 	case 'o':
 	case 'O':
-		time_since_l = realtime - sp_lastkey_time;
-		if (sp_key_was_l && time_since_l < 0.5)  // 500ms window to type 'lo'
-		{
-			m_singleplayer_cursor = 1;  // Always go to Load when 'lo' is typed
-			S_LocalSound("misc/menu1.wav");
+		if (!horde_map) { // bdd3
+			time_since_l = realtime - sp_lastkey_time;
+			if (sp_key_was_l && time_since_l < 0.5)  // 500ms window to type 'lo'
+			{
+				m_singleplayer_cursor = 1;  // Always go to Load when 'lo' is typed
+				S_LocalSound("misc/menu1.wav");
+			}
+			sp_key_was_l = false;  // Reset the flag
 		}
-		sp_key_was_l = false;  // Reset the flag
 		break;
 
 	case 'e':
@@ -1591,9 +1623,11 @@ void M_SinglePlayer_Key (int key)
 		break;
 	case 's':
 	case 'S':
-		sp_key_was_l = false;
-		m_singleplayer_cursor = 2;  // Save Game
-		S_LocalSound("misc/menu1.wav");
+		if (!horde_map) { // bdd3
+			sp_key_was_l = false;
+			m_singleplayer_cursor = 2;  // Save Game
+			S_LocalSound("misc/menu1.wav");
+		}
 		break;
 
 	case K_DOWNARROW:
@@ -1620,29 +1654,48 @@ void M_SinglePlayer_Key (int key)
 		switch (m_singleplayer_cursor)
 		{
 		case 0:
-			if (sv.active)
-				if (!SCR_ModalMessage("Are you sure you want to\nstart a new game?\n", 0.0f))
-					break;
-			key_dest = key_game;
-			IN_UpdateGrabs();
-			if (sv.active)
-				Cbuf_AddText ("disconnect\n");
 			Cbuf_AddText ("maxplayers 1\n");
 			Cbuf_AddText ("samelevel 0\n"); //spike -- you'd be amazed how many qw players have this setting breaking their singleplayer experience...
 			Cbuf_AddText ("deathmatch 0\n"); //johnfitz
 			Cbuf_AddText ("coop 0\n"); //johnfitz
-			Cbuf_AddText ("startmap_sp\n");
+			M_Menu_Skill_f();
+			if (sv.active) {
+				if (!SCR_ModalMessage(LOC_GetString("$msg_are_you_sure_new"), 0.0f))
+					break;
+				Cbuf_AddText ("disconnect\n");
+			}
+			//Cbuf_AddText("map start");
 			break;
 
 		case 1:
-			M_Menu_Load_f ();
+			if (horde_map) { // bdd3
+				SCR_ModalMessage(LOC_GetString("$horde_load_save_disabled"), 4.0f);
+			} else
+				M_Menu_Load_f ();
 			break;
 
 		case 2:
-			M_Menu_Save_f ();
+			if (horde_map) {
+				SCR_ModalMessage(LOC_GetString("$horde_load_save_disabled"), 4.0f);
+			} else {
+				if (SCR_ModalMessage(LOC_GetString("$msg_are_you_sure_loadquick"), 0.0f))
+					Cbuf_AddText("load quick.sav\n");
+			}
 			break;
 		case 3:
+			if (horde_map) {
+				SCR_ModalMessage(LOC_GetString("$horde_load_save_disabled"), 4.0f);
+			} else
+				M_Menu_Save_f();
+			break;
+		case 4:
+			M_Menu_Campaign_f();
+			break;
+		case 5:
 			Cbuf_AddText("menu_maps\n");
+			break;
+		case 6:
+			M_Menu_Horde_f();
 			break;
 		}
 		break;
@@ -2340,45 +2393,38 @@ void M_Menu_Skill_f(void)
 void M_Skill_Draw(void)
 {
 	int		x, y, f;
-	qpic_t* p;
 
 	M_DrawTransPic(16, 4, Draw_CachePic("gfx/qplaque.lmp"));
-	p = Draw_CachePic(m_skill_usecustomtitle ? "gfx/p_skill.lmp" : "gfx/ttl_sgl.lmp");
-	M_DrawPic((320 - p->width) / 2, 4, p);
+
+	const char* title = LOC_GetString("$menu_skills");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
 	x = 72;
 	y = 32;
 
-	M_Ticker_Update(&m_skill_ticker);
-	M_PrintScroll(x, 32, 30 * 8, m_skill_maptitle, m_skill_ticker.scroll_time, false);
-
+	if (!m_skill_from_newgame) {
+		M_Ticker_Update(&m_skill_ticker);
+		M_PrintScroll(x, 32, 30 * 8, m_skill_maptitle, m_skill_ticker.scroll_time, false);
+	}
 	y += 16;
 
-	if (m_skill_usegfx)
+	char* const skills[] =
 	{
-		M_DrawTransPic(x, y, Draw_CachePic("gfx/skillmenu.lmp"));
-		if (m_skill_cursor < 4)
-			M_DrawQuakeCursor(x - 18, y + m_skill_cursor * 20);
-		y += 4 * 20;
-	}
-	else
-	{
-		static const char* const skills[] =
-		{
-			"EASY",
-			"NORMAL",
-			"HARD",
-			"NIGHTMARE",
-		};
+		LOC_GetString("$menu_easy"),
+		LOC_GetString("$menu_normal"),
+		LOC_GetString("$menu_hard"),
+		LOC_GetString("$menu_nightmare"),
+	};
 
-		for (f = 0; f < 4; f++)
-			M_Print(x, y + f * 16 + 2, skills[f]);
-		if (m_skill_cursor < 4)
-			M_DrawArrowCursor(x - 16, y + m_skill_cursor * 16 + 4);
-		y += 4 * 16;
+	for (f = 0; f < 4; f++)
+	{
+		M_Print(x, y + f * 16 + 2, skills[f]);
+	}
+	if (m_skill_cursor < 4)
+	{
+		M_DrawArrowCursor(x - 16, y + m_skill_cursor * 16 + 2);
 	}
 }
-
 static double skill_last_key_time = 0.0; // Tracks last key time for 'ni' combo
 static qboolean skill_was_n = false;    // Tracks if the last key was 'n'
 
@@ -10158,6 +10204,589 @@ void M_Help_Key (int key)
 
 }
 
+static struct
+{
+	menulist_t			list;
+	enum m_state_e		prev;
+	int					prev_cursor;
+	qboolean			scrollbar_grab;
+	menuticker_t		ticker;
+	int					mapcount;
+	int					x, y, cols;
+	mapitem_t* items;
+	int* filtered_indices;
+} campaignmenu;
+
+static void M_Campaign_Add(const char* name, const char* date)
+{
+	mapitem_t map;
+	map.name = name;
+	map.date = date; // Set the date
+
+	VEC_PUSH(campaignmenu.items, map);
+	campaignmenu.mapcount = VEC_SIZE(campaignmenu.items);
+}
+
+static void M_Campaign_Refilter(void)
+{
+	int i;
+	VEC_CLEAR(campaignmenu.filtered_indices);
+
+	for (i = 0; i < campaignmenu.mapcount; i++)
+	{
+		if (campaignmenu.list.search.len == 0 || q_strcasestr(campaignmenu.items[i].name, campaignmenu.list.search.text) || q_strcasestr(campaignmenu.items[i].date, campaignmenu.list.search.text))
+		{
+			VEC_PUSH(campaignmenu.filtered_indices, i);
+		}
+	}
+
+	campaignmenu.list.numitems = VEC_SIZE(campaignmenu.filtered_indices);
+
+	if (campaignmenu.list.cursor >= campaignmenu.list.numitems)
+		campaignmenu.list.cursor = campaignmenu.list.numitems - 1;
+
+	if (campaignmenu.list.cursor < 0 && campaignmenu.list.numitems > 0)
+		campaignmenu.list.cursor = 0;
+
+	M_List_CenterCursor(&campaignmenu.list);
+}
+
+static void M_Campaign_Init(void)
+{
+	filelist_item_t* item;
+
+	campaignmenu.scrollbar_grab = false;
+	campaignmenu.list.viewsize = MAX_VIS_MAPS;
+	campaignmenu.list.cursor = -1;
+	campaignmenu.list.scroll = 0;
+	campaignmenu.list.numitems = 0;
+	campaignmenu.mapcount = 0;
+	VEC_CLEAR(campaignmenu.items);
+	VEC_CLEAR(campaignmenu.filtered_indices);
+
+	memset(&campaignmenu.list.search, 0, sizeof(campaignmenu.list.search));
+	campaignmenu.list.search.maxlen = 32;
+
+	M_Ticker_Init(&campaignmenu.ticker);
+
+	const char* campaign_data = (const char*)COM_LoadMallocFile("campaign.json", NULL);
+	if (campaign_data) {
+		json_t* campaign_json = JSON_Parse(campaign_data);
+		free((void*)campaign_data);
+		if (campaign_json == NULL) {
+			return;
+		}
+		jsonentry_t* sub_item = campaign_json->root->firstchild;
+		while (sub_item)
+		{
+			const jsonentry_t* name = JSON_Find(sub_item, "name", JSON_STRING);
+			const jsonentry_t* data = JSON_Find(sub_item, "data", JSON_STRING);
+			M_Campaign_Add(name->string, data->string);
+			sub_item = sub_item->next;
+		}
+	}
+
+	M_Campaign_Refilter();
+
+	if (campaignmenu.list.cursor == -1)
+		campaignmenu.list.cursor = 0;
+
+	M_List_CenterCursor(&campaignmenu.list);
+}
+
+void M_Menu_Campaign_f(void)
+{
+	key_dest = key_menu;
+	campaignmenu.prev = m_state;
+	m_state = m_campaign;
+	m_entersound = true;
+	M_Campaign_Init();
+}
+
+void M_Campaign_Draw(void)
+{
+	int x, y, i, cols;
+	int firstvis, numvis;
+
+	x = 16;
+	y = 32;
+	cols = 36;
+
+	campaignmenu.x = x;
+	campaignmenu.y = y;
+	campaignmenu.cols = cols;
+
+	if (!keydown[K_MOUSE1])
+		campaignmenu.scrollbar_grab = false;
+
+	if (campaignmenu.prev_cursor != campaignmenu.list.cursor)
+	{
+		campaignmenu.prev_cursor = campaignmenu.list.cursor;
+		M_Ticker_Init(&campaignmenu.ticker);
+	}
+	else
+		M_Ticker_Update(&campaignmenu.ticker);
+
+	Draw_String(x, y - 28, LOC_GetString("$menu_campaign"));
+	M_DrawQuakeBar(x - 8, y - 16, cols + 2);
+
+	M_List_GetVisibleRange(&campaignmenu.list, &firstvis, &numvis);
+	for (i = 0; i < numvis; i++)
+	{
+		int idx = i + firstvis;
+		int map_idx = campaignmenu.filtered_indices[idx];
+		mapitem_t* map_item = &campaignmenu.items[map_idx];
+		qboolean selected = (idx == campaignmenu.list.cursor);
+
+		if (campaignmenu.list.search.len > 0)
+		{
+			M_PrintHighlightScroll2(x, y + i * 8, (cols - 2) * 8,
+				map_item->name,
+				LOC_GetString(map_item->date),
+				campaignmenu.list.search.text,
+				selected ? campaignmenu.ticker.scroll_time : 0.0);
+		}
+		else
+		{
+			M_PrintScroll2(x, y + i * 8, (cols - 2) * 8,
+				map_item->name,
+				LOC_GetString(map_item->date),
+				selected ? campaignmenu.ticker.scroll_time : 0.0);
+		}
+
+		if (selected)
+			M_DrawCharacter(x - 8, y + i * 8, 12 + ((int)(realtime * 4) & 1));
+	}
+
+	if (M_List_GetOverflow(&campaignmenu.list) > 0)
+	{
+		M_List_DrawScrollbar(&campaignmenu.list, x + cols * 8 - 8, y);
+
+		if (campaignmenu.list.scroll > 0)
+			M_DrawEllipsisBar(x, y - 8, cols);
+		if (campaignmenu.list.scroll + campaignmenu.list.viewsize < campaignmenu.list.numitems)
+			M_DrawEllipsisBar(x, y + campaignmenu.list.viewsize * 8, cols);
+	}
+
+	if (campaignmenu.list.search.len > 0) // Draw search box if search is active
+	{
+		M_DrawTextBox(16, 176, 32, 1);
+		M_PrintHighlight(24, 184, campaignmenu.list.search.text,
+			campaignmenu.list.search.text,
+			campaignmenu.list.search.len);
+		int cursor_x = 24 + 8 * campaignmenu.list.search.len; // Start position + character width * text length
+		if (campaignmenu.list.numitems == 0)
+			M_DrawCharacter(cursor_x, 184, 11 /*^ 128*/);
+		else
+			M_DrawCharacter(cursor_x, 184, 10 + ((int)(realtime * 4) & 1));
+	}
+}
+
+qboolean M_Campaign_Match(int index, char initial)
+{
+	int map_idx = campaignmenu.filtered_indices[index];
+	return q_tolower(campaignmenu.items[map_idx].name[0]) == initial;
+}
+
+void M_Campaign_Key(int key)
+{
+	int x, y;
+
+	if (key >= 32 && key < 127) // Handle search input first, printable characters
+	{
+		if (campaignmenu.list.search.len < campaignmenu.list.search.maxlen)
+		{
+			campaignmenu.list.search.text[campaignmenu.list.search.len++] = key;
+			campaignmenu.list.search.text[campaignmenu.list.search.len] = 0;
+			M_Maps_Refilter();
+			return;
+		}
+	}
+
+	if (campaignmenu.scrollbar_grab)
+	{
+		switch (key)
+		{
+		case K_ESCAPE:
+		case K_BBUTTON:
+		case K_MOUSE4:
+		case K_MOUSE2:
+			campaignmenu.scrollbar_grab = false;
+			break;
+		}
+		return;
+	}
+
+	if (M_List_Key(&campaignmenu.list, key))
+		return;
+
+	if (M_List_CycleMatch(&campaignmenu.list, key, M_Campaign_Match))
+		return;
+
+	if (M_Ticker_Key(&campaignmenu.ticker, key))
+		return;
+
+	switch (key)
+	{
+	case K_ESCAPE:
+		if (campaignmenu.list.search.len > 0) // Clear search but stay in menu
+		{
+			campaignmenu.list.search.len = 0;
+			campaignmenu.list.search.text[0] = 0;
+			M_Campaign_Refilter();
+			return;
+		}
+		M_Menu_SinglePlayer_f();
+	case K_BBUTTON:
+	case K_MOUSE4:
+	case K_MOUSE2:
+		M_Menu_SinglePlayer_f();
+		break;
+	case K_BACKSPACE:
+		if (campaignmenu.list.search.len > 0)
+		{
+			campaignmenu.list.search.text[--campaignmenu.list.search.len] = 0;
+			M_Campaign_Refilter();
+			return;
+		}
+		break;
+	case K_ENTER:
+	case K_KP_ENTER:
+	case K_ABUTTON:
+	enter:
+		if (campaignmenu.list.numitems > 0 && campaignmenu.items[campaignmenu.filtered_indices[campaignmenu.list.cursor]].name[0])
+		{
+			m_skill_from_newgame = false;
+			M_SetSkillMenuMap(campaignmenu.items[campaignmenu.filtered_indices[campaignmenu.list.cursor]].name);
+			M_Menu_Skill_f();
+		}
+		else
+			S_LocalSound("misc/menu3.wav");
+		break;
+
+	case K_MOUSE1:
+		x = m_mousex - campaignmenu.x - (campaignmenu.cols - 1) * 8;
+		y = m_mousey - campaignmenu.y;
+		if (x < -8 || !M_List_UseScrollbar(&campaignmenu.list, y))
+			goto enter;
+		campaignmenu.scrollbar_grab = true;
+		M_Campaign_Mousemove(m_mousex, m_mousey);
+		break;
+
+	default:
+		break;
+	}
+}
+
+void M_Campaign_Mousemove(int cx, int cy)
+{
+	cy -= campaignmenu.y;
+
+	if (campaignmenu.scrollbar_grab)
+	{
+		if (!keydown[K_MOUSE1])
+		{
+			campaignmenu.scrollbar_grab = false;
+			return;
+		}
+		M_List_UseScrollbar(&campaignmenu.list, cy);
+		// Note: no return, we also update the cursor
+	}
+
+	M_List_Mousemove(&campaignmenu.list, cy);
+}
+
+static struct
+{
+	menulist_t			list;
+	enum m_state_e		prev;
+	int					prev_cursor;
+	qboolean			scrollbar_grab;
+	menuticker_t		ticker;
+	int					mapcount;
+	int					x, y, cols;
+	mapitem_t* items;
+	int* filtered_indices;
+} hordemenu;
+
+static void M_Horde_Add(const char* name, const char* date)
+{
+	mapitem_t map;
+	map.name = name;
+	map.date = date; // Set the date
+
+	VEC_PUSH(hordemenu.items, map);
+	hordemenu.mapcount = VEC_SIZE(hordemenu.items);
+}
+
+static void M_Horde_Refilter(void)
+{
+	int i;
+	VEC_CLEAR(hordemenu.filtered_indices);
+
+	for (i = 0; i < hordemenu.mapcount; i++)
+	{
+		if (hordemenu.list.search.len == 0 || q_strcasestr(hordemenu.items[i].name, hordemenu.list.search.text) || q_strcasestr(hordemenu.items[i].date, hordemenu.list.search.text))
+		{
+			VEC_PUSH(hordemenu.filtered_indices, i);
+		}
+	}
+
+	hordemenu.list.numitems = VEC_SIZE(hordemenu.filtered_indices);
+
+	if (hordemenu.list.cursor >= hordemenu.list.numitems)
+		hordemenu.list.cursor = hordemenu.list.numitems - 1;
+
+	if (hordemenu.list.cursor < 0 && hordemenu.list.numitems > 0)
+		hordemenu.list.cursor = 0;
+
+	M_List_CenterCursor(&hordemenu.list);
+}
+
+static void M_Horde_Init(void)
+{
+	filelist_item_t* item;
+
+	hordemenu.scrollbar_grab = false;
+	hordemenu.list.viewsize = MAX_VIS_MAPS;
+	hordemenu.list.cursor = -1;
+	hordemenu.list.scroll = 0;
+	hordemenu.list.numitems = 0;
+	hordemenu.mapcount = 0;
+	VEC_CLEAR(hordemenu.items);
+	VEC_CLEAR(hordemenu.filtered_indices);
+
+	memset(&hordemenu.list.search, 0, sizeof(hordemenu.list.search));
+	hordemenu.list.search.maxlen = 32;
+
+	M_Ticker_Init(&hordemenu.ticker);
+
+	const char* horde_data = (const char*)COM_LoadMallocFile("horde.json", NULL);
+	if (horde_data) {
+		json_t* horde_json = JSON_Parse(horde_data);
+		free((void *)horde_data);
+		if (horde_json == NULL) {
+			return;
+		}
+		jsonentry_t* sub_item = horde_json->root->firstchild;
+		while (sub_item)
+		{
+			const jsonentry_t* name = JSON_Find(sub_item, "name", JSON_STRING);
+			const jsonentry_t* data = JSON_Find(sub_item, "data", JSON_STRING);
+			M_Horde_Add(name->string, data->string);
+			sub_item = sub_item->next;
+		}
+	}
+
+	M_Horde_Refilter();
+
+	if (hordemenu.list.cursor == -1)
+		hordemenu.list.cursor = 0;
+
+	M_List_CenterCursor(&hordemenu.list);
+}
+
+void M_Menu_Horde_f(void)
+{
+	key_dest = key_menu;
+	hordemenu.prev = m_state;
+	m_state = m_horde;
+	m_entersound = true;
+	M_Horde_Init();
+}
+
+void M_Horde_Draw(void)
+{
+	int x, y, i, cols;
+	int firstvis, numvis;
+
+	x = 16;
+	y = 32;
+	cols = 36;
+
+	hordemenu.x = x;
+	hordemenu.y = y;
+	hordemenu.cols = cols;
+
+	if (!keydown[K_MOUSE1])
+		hordemenu.scrollbar_grab = false;
+
+	if (hordemenu.prev_cursor != hordemenu.list.cursor)
+	{
+		hordemenu.prev_cursor = hordemenu.list.cursor;
+		M_Ticker_Init(&hordemenu.ticker);
+	}
+	else
+		M_Ticker_Update(&hordemenu.ticker);
+
+	Draw_String(x, y - 28, LOC_GetString("$menu_horde"));
+	M_DrawQuakeBar(x - 8, y - 16, cols + 2);
+
+	M_List_GetVisibleRange(&hordemenu.list, &firstvis, &numvis);
+	for (i = 0; i < numvis; i++)
+	{
+		int idx = i + firstvis;
+		int map_idx = hordemenu.filtered_indices[idx];
+		mapitem_t* map_item = &hordemenu.items[map_idx];
+		qboolean selected = (idx == hordemenu.list.cursor);
+
+		if (hordemenu.list.search.len > 0)
+		{
+			M_PrintHighlightScroll2(x, y + i * 8, (cols - 2) * 8,
+				map_item->name,
+				LOC_GetString(map_item->date),
+				hordemenu.list.search.text,
+				selected ? hordemenu.ticker.scroll_time : 0.0);
+		}
+		else
+		{
+			M_PrintScroll2(x, y + i * 8, (cols - 2) * 8,
+				map_item->name,
+				LOC_GetString(map_item->date),
+				selected ? hordemenu.ticker.scroll_time : 0.0);
+		}
+
+		if (selected)
+			M_DrawCharacter(x - 8, y + i * 8, 12 + ((int)(realtime * 4) & 1));
+	}
+
+	if (M_List_GetOverflow(&hordemenu.list) > 0)
+	{
+		M_List_DrawScrollbar(&hordemenu.list, x + cols * 8 - 8, y);
+
+		if (hordemenu.list.scroll > 0)
+			M_DrawEllipsisBar(x, y - 8, cols);
+		if (hordemenu.list.scroll + hordemenu.list.viewsize < hordemenu.list.numitems)
+			M_DrawEllipsisBar(x, y + hordemenu.list.viewsize * 8, cols);
+	}
+
+	if (hordemenu.list.search.len > 0) // Draw search box if search is active
+	{
+		M_DrawTextBox(16, 176, 32, 1);
+		M_PrintHighlight(24, 184, hordemenu.list.search.text,
+			hordemenu.list.search.text,
+			hordemenu.list.search.len);
+		int cursor_x = 24 + 8 * hordemenu.list.search.len; // Start position + character width * text length
+		if (hordemenu.list.numitems == 0)
+			M_DrawCharacter(cursor_x, 184, 11 /*^ 128*/);
+		else
+			M_DrawCharacter(cursor_x, 184, 10 + ((int)(realtime * 4) & 1));
+	}
+}
+
+qboolean M_Horde_Match(int index, char initial)
+{
+	int map_idx = hordemenu.filtered_indices[index];
+	return q_tolower(hordemenu.items[map_idx].name[0]) == initial;
+}
+
+void M_Horde_Key(int key)
+{
+	int x, y;
+
+	if (key >= 32 && key < 127) // Handle search input first, printable characters
+	{
+		if (hordemenu.list.search.len < hordemenu.list.search.maxlen)
+		{
+			hordemenu.list.search.text[hordemenu.list.search.len++] = key;
+			hordemenu.list.search.text[hordemenu.list.search.len] = 0;
+			M_Maps_Refilter();
+			return;
+		}
+	}
+
+	if (hordemenu.scrollbar_grab)
+	{
+		switch (key)
+		{
+		case K_ESCAPE:
+		case K_BBUTTON:
+		case K_MOUSE4:
+		case K_MOUSE2:
+			hordemenu.scrollbar_grab = false;
+			break;
+		}
+		return;
+	}
+
+	if (M_List_Key(&hordemenu.list, key))
+		return;
+
+	if (M_List_CycleMatch(&hordemenu.list, key, M_Horde_Match))
+		return;
+
+	if (M_Ticker_Key(&hordemenu.ticker, key))
+		return;
+
+	switch (key)
+	{
+	case K_ESCAPE:
+		if (hordemenu.list.search.len > 0) // Clear search but stay in menu
+		{
+			hordemenu.list.search.len = 0;
+			hordemenu.list.search.text[0] = 0;
+			M_Horde_Refilter();
+			return;
+		}
+		M_Menu_SinglePlayer_f();
+	case K_BBUTTON:
+	case K_MOUSE4:
+	case K_MOUSE2:
+		M_Menu_SinglePlayer_f();
+		break;
+	case K_BACKSPACE:
+		if (hordemenu.list.search.len > 0)
+		{
+			hordemenu.list.search.text[--hordemenu.list.search.len] = 0;
+			M_Horde_Refilter();
+			return;
+		}
+		break;
+	case K_ENTER:
+	case K_KP_ENTER:
+	case K_ABUTTON:
+	enter:
+		if (hordemenu.list.numitems > 0 && hordemenu.items[hordemenu.filtered_indices[hordemenu.list.cursor]].name[0])
+		{
+			const char* name = hordemenu.items[hordemenu.filtered_indices[hordemenu.list.cursor]].name;
+			Cbuf_AddText(va("map %s.bsp\n", name));
+		}
+		else
+			S_LocalSound("misc/menu3.wav");
+		break;
+
+	case K_MOUSE1:
+		x = m_mousex - hordemenu.x - (hordemenu.cols - 1) * 8;
+		y = m_mousey - hordemenu.y;
+		if (x < -8 || !M_List_UseScrollbar(&hordemenu.list, y))
+			goto enter;
+		hordemenu.scrollbar_grab = true;
+		M_Horde_Mousemove(m_mousex, m_mousey);
+		break;
+
+	default:
+		break;
+	}
+}
+
+void M_Horde_Mousemove(int cx, int cy)
+{
+	cy -= hordemenu.y;
+
+	if (hordemenu.scrollbar_grab)
+	{
+		if (!keydown[K_MOUSE1])
+		{
+			hordemenu.scrollbar_grab = false;
+			return;
+		}
+		M_List_UseScrollbar(&hordemenu.list, cy);
+		// Note: no return, we also update the cursor
+	}
+
+	M_List_Mousemove(&hordemenu.list, cy);
+}
+
 /*
 ==================
 Quit Menu
@@ -14098,7 +14727,16 @@ void M_Draw (void)
 	case m_slist:
 		M_ServerList_Draw ();
 		break;
+
+	case m_horde:
+		M_Horde_Draw();
+		break;
+
+	case m_campaign:
+		M_Campaign_Draw();
+		break;
 	}
+
 
 	if (m_entersound)
 	{
@@ -14250,6 +14888,14 @@ void M_Keydown (int key)
 
 	case m_slist:
 		M_ServerList_Key (key);
+		return;
+
+	case m_horde:
+		M_Horde_Key(key);
+		return;
+
+	case m_campaign:
+		M_Campaign_Key(key);
 		return;
 	}
 }
@@ -14404,6 +15050,14 @@ void M_Mousemove(int x, int y) // woods #mousemenu
 
 	case m_slist:
 		M_ServerList_Mousemove(x, y);
+		return;
+	
+	case m_horde:
+		M_Horde_Mousemove(x, y);
+		return;
+	
+	case m_campaign:
+		M_Campaign_Mousemove(x, y);
 		return;
 	}
 }
