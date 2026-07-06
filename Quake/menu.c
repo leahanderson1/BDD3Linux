@@ -1411,8 +1411,8 @@ void M_Main_Key (int key) // woods #modsmenu #demosmenu (iw)
 		S_LocalSound("misc/menu1.wav");
 		break;
 
-	case 'q':
-	case 'Q':
+	case 'l':
+	case 'L':
 		m_key_was_m = false;
 		m_main_cursor = MAIN_QUIT;
 		S_LocalSound("misc/menu1.wav");
