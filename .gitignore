@@ -21,3 +21,6 @@ Quake/quakespasm
 # misc testing shit
 
 Quake/history.txt
+
+# vim
+*.swp

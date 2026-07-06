@@ -33,6 +33,9 @@ MP3LIB=mad
 # which library to use for ogg decoding: vorbis or tremor
 VORBISLIB=vorbis
 
+# instead of stubbing out the achievements, write what would've been written to the Windows daemon to a Unix socket at /tmp/bdd3.sock
+USE_ACHIEVEMENTS=0
+
 # ---------------------------
 # Helper functions
 # ---------------------------
@@ -195,7 +198,9 @@ endif
 ifeq ($(USE_CODEC_UMX),1)
 CFLAGS+= -DUSE_CODEC_UMX
 endif
-
+ifeq ($(USE_ACHIEVEMENTS),1)
+CFLAGS+= -DACHIEVEMENT_SUPPORT
+endif
 COMMON_LIBS:= -lGL
 
 ifeq ($(USE_ZLIB),1)
@@ -227,7 +232,8 @@ MUSIC_OBJS:= bgmusic.o \
 	snd_umx.o
 COMOBJ_SND := snd_voip.o snd_dma.o snd_mix.o snd_mem.o $(MUSIC_OBJS)
 SYSOBJ_SND := snd_sdl.o
-SYSOBJ_CDA := cd_sdl.o
+#The physical edition of BDD3 stores the audio tracks as Vorbis data on the filesystem, no point in actually keeping in support for Quake-style audio
+SYSOBJ_CDA := cd_null.o
 SYSOBJ_INPUT := in_sdl.o
 SYSOBJ_GL_VID:= gl_vidsdl.o
 SYSOBJ_NET := net_bsd.o net_udp.o

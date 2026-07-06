@@ -1869,16 +1869,54 @@ void PR_spawnfunc_misc_model(edict_t *self)
 }
 
 static void PF_unlockachievement(void) {
-	if (Cvar_VariableValue("SV_Cheats") != 0) {
+#ifdef ACHIEVEMENT_SUPPORT
+	if (Cvar_VariableValue("SV_Cheats") != 0)
+		return;
+	const char* name = G_STRING(OFS_PARM0);
+	int sock_fd;
+	struct sockaddr_un addr;
+	char buffer[512];
+	snprintf(buffer, sizeof(buffer) - 1, "unlock_achievement %s", name);
+	if ((sock_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+		perror("socket error");
 		return;
 	}
-	const char* name = G_STRING(OFS_PARM0);
-//	Con_Printf("unlock_achievement %s\n", name);
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, "/tmp/bdd3.sock", sizeof(addr.sun_path) - 1);
+	if (connect(sock_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+		close(sock_fd);
+		return;
+	}
+	write(sock_fd, buffer, strlen(buffer));
+#endif
 }
 static void PF_updatestat(void) {
+#ifdef ACHIEVEMENT_SUPPORT
+	if (Cvar_VariableValue("SV_Cheats") != 0)
+		return;
 	const char* name = G_STRING(OFS_PARM0);
 	int value = G_INT(OFS_PARM1);
+	int sock_fd;
+	struct sockaddr_un addr;
+	char buffer[512];
+	snprintf(buffer, sizeof(buffer) - 1, "update_stat %s %i", name, value);
+	if ((sock_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+		perror("socket error");
+		return;
+	}
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, "/tmp/bdd3.sock", sizeof(addr.sun_path) - 1);
+	if (connect(sock_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+		close(sock_fd);
+		return;
+	}
+	write(sock_fd, buffer, strlen(buffer));
 //	Con_Printf("update_stat %s %i\n", name, value);
+#endif
 }
 
 const builtin_t pr_ssqcbuiltins[] =
