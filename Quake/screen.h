@@ -99,6 +99,10 @@ typedef enum {
 	CANVAS_TOPRIGHT4, // woods #hud_diff
 	CANVAS_CSQC,
 	CANVAS_MENUQC,
+	CANVAS_SA,
+	CANVAS_SA_SMALL,
+	CANVAS_SA_BOTTOM,
+	CANVAS_SCOREBOARD_SA,
 	CANVAS_INVALID = -1
 } canvastype;
 extern	cvar_t		scr_menuscale;

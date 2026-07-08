@@ -743,6 +743,25 @@ void Draw_String (int x, int y, const char *str)
 
 	glEnd ();
 }
+void Draw_String_Right (int x, int y, const char *str)
+{
+	//if (y <= -8) // woods enabled for more printing options #varmatchclock
+	//	return;			// totally off screen
+	int len = strlen(str);
+	int startX = x - (len * 8);
+	GL_Bind (char_texture);
+	glBegin (GL_QUADS);
+
+	while (*str)
+	{
+		if (*str != 32) //don't waste verts on spaces
+			Draw_CharacterQuad (startX, y, *str);
+		str++;
+		startX += 8;
+	}
+
+	glEnd ();
+}
 
 /*
 ================
@@ -776,6 +795,44 @@ void Draw_StringRGBA (int x, int y, const char* str, plcolour_t c, float alpha)
 			Draw_CharacterQuad(x, y, *str);
 		str++;
 		x += 8;
+	}
+
+	glEnd();
+
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+	glEnable(GL_ALPHA_TEST);
+	glDisable(GL_BLEND);
+	glColor4f(1, 1, 1, 1);
+}
+void Draw_StringRGBA_Right (int x, int y, const char* str, plcolour_t c, float alpha)
+{
+	//if (y <= -8) // woods enabled for more printing options #varmatchclock
+	//	return;			// totally off screen
+
+	int len = strlen(str);
+	int startX = x - (len * 8);
+	glEnable(GL_BLEND);
+
+	if (c.type == 2)
+		glColor4f(c.rgb[0] / 255.0, c.rgb[1] / 255.0, c.rgb[2] / 255.0, alpha);
+	else
+	{
+		byte* pal = (byte*)&d_8to24table[(c.basic << 4) + 8];
+		glColor4f(pal[0] / 255.0, pal[1] / 255.0, pal[2] / 255.0, alpha);
+	}
+
+	glDisable(GL_ALPHA_TEST);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+	GL_Bind(char_texture);
+	glBegin(GL_QUADS);
+
+	while (*str)
+	{
+		if (*str != 32) //don't waste verts on spaces
+			Draw_CharacterQuad(startX, y, *str);
+		str++;
+		startX += 8;
 	}
 
 	glEnd();
@@ -1290,6 +1347,63 @@ void GL_SetCanvas (canvastype newcanvas)
 
 	switch(newcanvas)
 	{
+	case CANVAS_SA:
+	{
+		const float base_aspect = 320.0f / 200.0f;
+		float cur_aspect = (float)glwidth / (float)glheight;
+
+		float s_w = (float)glwidth / 320.0f;
+		float s_h = (float)glheight / 200.0f;
+
+		float s = (cur_aspect > base_aspect) ? s_h : s_w;
+
+		int vp_w = (int)(320.0f * s + 0.5f);
+		int vp_h = (int)(200.0f * s + 0.5f);
+
+		int vp_x = glx + (glwidth - vp_w) / 2;
+		int vp_y = gly + (glheight - vp_h);
+		glOrtho(0, 320, 200, 12, -99999, 99999);
+		glViewport(vp_x, vp_y, vp_w, vp_h);
+		break;
+	}
+	case CANVAS_SA_BOTTOM:
+	{
+                float s = (float)glwidth / 320.0f;
+
+                int vp_w = glwidth;
+                int vp_h = (int)(200.0f * s + 0.5f);
+
+                int vp_x = glx;
+                int vp_y = gly; 
+
+                glViewport(vp_x, vp_y, vp_w, vp_h);
+
+                glOrtho(0, 320, 200, 12, -99999, 99999);
+
+                break;
+	}
+        case CANVAS_SA_SMALL:
+	{
+                const float base_aspect = 320.0f / 200.0f;
+                float cur_aspect = (float)glwidth / (float)glheight;
+
+                float s_w = (float)glwidth / 320.0f;
+                float s_h = (float)glheight / 200.0f;
+
+                float s = (cur_aspect > base_aspect) ? s_h : s_w;
+
+                s *= 0.75f;
+
+                int vp_w = (int)(320.0f * s + 0.5f);
+                int vp_h = (int)(200.0f * s + 0.5f);
+
+                int vp_x = glx + (glwidth - vp_w) / 2;
+                int vp_y = gly + (glheight - vp_h) / 2;
+
+                glOrtho(0, 320, 200, 0, -99999, 99999);
+                glViewport(vp_x, vp_y, vp_w, vp_h);
+                break;
+	}
 	case CANVAS_DEFAULT:
 		glOrtho (0, glwidth, glheight, 0, -99999, 99999);
 		glViewport (glx, gly, glwidth, glheight);
@@ -1467,6 +1581,11 @@ void GL_SetCanvas (canvastype newcanvas)
 		s = ((float)glwidth / vid.conwidth); //use console scale
 		glOrtho(0, 320, 200, 0, -99999, 99999);
 		glViewport(glx + glwidth - 200 * s, (gly + glheight - 212 * s), 320 * s, 200 * s);
+		break;
+	case CANVAS_SCOREBOARD_SA:
+		s = ((float)glwidth / vid.conwidth); //use console scale
+		glOrtho(0, glwidth / s, glheight / s, 0, -99999, 99999);
+		glViewport(glx, gly, glwidth, glheight);
 		break;
 	default:
 		Sys_Error ("GL_SetCanvas: bad canvas type");
