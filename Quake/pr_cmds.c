@@ -1869,16 +1869,16 @@ void PR_spawnfunc_misc_model(edict_t *self)
 }
 
 static void PF_unlockachievement(void) {
-	if (Cvar_VariableValue("SV_Cheats") != 0) {
+/*	if (Cvar_VariableValue("SV_Cheats") != 0) {
 		return;
 	}
 	const char* name = G_STRING(OFS_PARM0);
-	Con_Printf("unlock_achievement %s\n", name);
+	Con_Printf("unlock_achievement %s\n", name);*/
 }
 static void PF_updatestat(void) {
-	const char* name = G_STRING(OFS_PARM0);
+/*	const char* name = G_STRING(OFS_PARM0);
 	int value = G_INT(OFS_PARM1);
-	Con_Printf("update_stat %s %i\n", name, value);
+	Con_Printf("update_stat %s %i\n", name, value);*/
 }
 
 const builtin_t pr_ssqcbuiltins[] =
