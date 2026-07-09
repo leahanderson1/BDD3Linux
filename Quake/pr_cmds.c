@@ -1877,11 +1877,8 @@ static void PF_unlockachievement(void) {
 	struct sockaddr_un addr;
 	char buffer[512];
 	snprintf(buffer, sizeof(buffer) - 1, "unlock_achievement %s", name);
-	if ((sock_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-		perror("socket error");
+	if ((sock_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
 		return;
-	}
-
 	memset(&addr, 0, sizeof(addr));
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, "/tmp/bdd3.sock", sizeof(addr.sun_path) - 1);
