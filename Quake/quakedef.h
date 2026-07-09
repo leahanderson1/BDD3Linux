@@ -356,6 +356,8 @@ typedef struct
 #include "location.h"      // rook / woods #pqteam
 #include "iplog.h"		// JPG 1.05 - ip address logging // woods #iplog
 
+#include "font.h"
+
 //=============================================================================
 
 // the host system specifies the base of the directory tree, the

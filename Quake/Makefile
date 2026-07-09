@@ -108,6 +108,7 @@ endif
 
 ifeq ($(USE_SDL2),1)
 CFLAGS += -DUSE_SDL2
+LDFLAGS += -lSDL2_ttf
 endif
 #make use of LFS on 32bit even on systems.
 CFLAGS += -D_FILE_OFFSET_BITS=64
@@ -310,6 +311,7 @@ OBJS := strlcat.o \
 	sv_user.o \
 	world.o \
 	zone.o \
+	font.o \
 	$(SYSOBJ_SYS) $(SYSOBJ_MAIN)
 
 # ---------------------------

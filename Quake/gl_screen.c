@@ -619,7 +619,8 @@ void SCR_DrawCenterString (void) //actually do the drawing
 		x = (320 - l*8)/2;	//johnfitz -- 320x200 coordinate system
 		for (j=0 ; j<l ; j++, x+=8)
 		{
-			Draw_CharacterRGBA (x, y, start[j], CL_PLColours_Parse("0xffffff"), alpha);	//johnfitz -- stretch overlays
+			uint32_t codepoint = utf8_decode_nth(start, j, l);
+			Draw_CharacterRGBA (x, y, codepoint, CL_PLColours_Parse("0xffffff"), alpha);	//johnfitz -- stretch overlays
 			if (!remaining--)
 				return;
 		}

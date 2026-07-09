@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // draw.c -- 2d drawing
 
+#include "font.h"
 #include "quakedef.h"
 
 //extern unsigned char d_15to8table[65536]; //johnfitz -- never used
@@ -534,6 +535,8 @@ qboolean Draw_ReloadTextures(qboolean force)
 
 		Cache_Flush ();
 		Mod_ResetAll();
+		if(!setup_fonts())
+			exit(200);
 		return true;
 	}
 	return false;
@@ -606,17 +609,12 @@ void Draw_Character (int x, int y, int num)
 	/*if (y <= -8)
 		return;			// totally off screen*/ // woods alllow for negative drawing for #observerhud
 
-	num &= 255;
-
 	if (num == 32)
 		return; //don't waste verts on spaces
 
-	GL_Bind (char_texture);
-	glBegin (GL_QUADS);
 
-	Draw_CharacterQuad (x, y, (char) num);
+	draw_character_quad_ex(x, y,  num, 255, 255, 255);
 
-	glEnd ();
 }
 
 /*
@@ -629,49 +627,10 @@ void Draw_CharacterRGBA (int x, int y, int num, plcolour_t c, float alpha)
 	int				row, col;
 	float			frow, fcol, size;
 
-	num &= 255;
-
 	if (num == 32)
 		return; //don't waste verts on spaces
 
-	glEnable (GL_BLEND);
-
-	if (c.type == 2)
-		glColor4f(c.rgb[0] / 255.0, c.rgb[1] / 255.0, c.rgb[2] / 255.0, alpha);
-	else
-	{
-		byte* pal = (byte*)&d_8to24table[(c.basic << 4) + 8];
-		glColor4f(pal[0] / 255.0, pal[1] / 255.0, pal[2] / 255.0, alpha);
-	}
-
-	glDisable (GL_ALPHA_TEST);
-	glTexEnvf (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-
-	GL_Bind (char_texture);
-	glBegin (GL_QUADS);
-
-	row = num >> 4;
-	col = num & 15;
-
-	frow = row * 0.0625;
-	fcol = col * 0.0625;
-	size = 0.0625;
-
-	glTexCoord2f (fcol, frow);
-	glVertex2f (x, y);
-	glTexCoord2f (fcol + size, frow);
-	glVertex2f (x + 8, y);
-	glTexCoord2f (fcol + size, frow + size);
-	glVertex2f (x + 8, y + 8);
-	glTexCoord2f (fcol, frow + size);
-	glVertex2f (x, y + 8);
-
-	glEnd();
-
-	glTexEnvf (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-	glEnable (GL_ALPHA_TEST);
-	glDisable (GL_BLEND);
-	glColor4f (1, 1, 1, 1);
+	draw_character_quad_ex(x, y, num, c.rgb[0], c.rgb[1], c.rgb[2]);
 }
 
 void Draw_Character_Rotation (int x, int y, int num, int rotation) // woods #movementkeys
@@ -730,7 +689,7 @@ void Draw_String (int x, int y, const char *str)
 	//if (y <= -8) // woods enabled for more printing options #varmatchclock
 	//	return;			// totally off screen
 
-	GL_Bind (char_texture);
+/*	GL_Bind (char_texture);
 	glBegin (GL_QUADS);
 
 	while (*str)
@@ -741,7 +700,13 @@ void Draw_String (int x, int y, const char *str)
 		x += 8;
 	}
 
-	glEnd ();
+	glEnd ();*/
+	size_t len = strlen(str);
+	for (int i = 0; i < len; i++) {
+		uint32_t codepoint = utf8_decode_nth(str, i, len);
+		draw_character_quad_ex(x, y, codepoint, 255, 255, 255);
+		x += 8;
+	}
 }
 
 /*
@@ -754,23 +719,28 @@ void Draw_StringRGBA (int x, int y, const char* str, plcolour_t c, float alpha)
 	//if (y <= -8) // woods enabled for more printing options #varmatchclock
 	//	return;			// totally off screen
 
-	glEnable(GL_BLEND);
-
-	if (c.type == 2)
-		glColor4f(c.rgb[0] / 255.0, c.rgb[1] / 255.0, c.rgb[2] / 255.0, alpha);
-	else
-	{
+//	glEnable(GL_BLEND);
+	byte color[4];
+	color[3] = alpha * 255;
+	if (c.type == 2) {
+		color[0] = c.rgb[0];
+		color[1] = c.rgb[1];
+		color[2] = c.rgb[2];
+//		glColor4f(c.rgb[0] / 255.0, c.rgb[1] / 255.0, c.rgb[2] / 255.0, alpha);
+	} else {
 		byte* pal = (byte*)&d_8to24table[(c.basic << 4) + 8];
-		glColor4f(pal[0] / 255.0, pal[1] / 255.0, pal[2] / 255.0, alpha);
+		color[0] = pal[0];
+		color[1] = pal[1];
+		color[2] = pal[2];
 	}
 
-	glDisable(GL_ALPHA_TEST);
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+//	glDisable(GL_ALPHA_TEST);
+//	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
-	GL_Bind(char_texture);
-	glBegin(GL_QUADS);
+//	GL_Bind(char_texture);
+//	glBegin(GL_QUADS);
 
-	while (*str)
+/*	while (*str)
 	{
 		if (*str != 32) //don't waste verts on spaces
 			Draw_CharacterQuad(x, y, *str);
@@ -783,7 +753,14 @@ void Draw_StringRGBA (int x, int y, const char* str, plcolour_t c, float alpha)
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 	glEnable(GL_ALPHA_TEST);
 	glDisable(GL_BLEND);
-	glColor4f(1, 1, 1, 1);
+	glColor4f(1, 1, 1, 1);*/
+	size_t len = strlen(str);
+	for (int i = 0; i < len; i++) {
+		uint32_t codepoint = utf8_decode_nth(str, i, len);
+		draw_character_quad_ex(x, y, codepoint, color[0], color[1], color[2]);
+		x += 8;
+	}
+
 }
 
 /*

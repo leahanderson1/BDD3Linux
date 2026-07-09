@@ -1109,7 +1109,7 @@ static void Con_Print (const char *txt)
 
 		default:	// display character and advance
 			y = con_current % con_totallines;
-			con_text[y*con_linewidth+con_x] = c | mask;
+			con_text[y*con_linewidth+con_x] = c;
 			con_x++;
 			if (con_x >= con_linewidth)
 				con_x = 0;
@@ -2860,9 +2860,6 @@ void Con_DrawNotify (void)
 		if (i < 0)
 			continue;
 
-		if (i >= con_centerprint_start && i <= con_centerprint_end) // woods #centerlog
-			continue;
-
 		alpha = Con_NotifyAlpha (con_times[i % NUM_CON_TIMES]); // woods #confade
 		if (alpha <= 0.f)
 			continue;
@@ -2870,8 +2867,10 @@ void Con_DrawNotify (void)
 
 		clearnotify = 0;
 
-		for (x = 0; x < con_linewidth; x++)
-			Draw_CharacterRGBA ((x+1)<<3, v, text[x], CL_PLColours_Parse("0xffffff"), alpha); // woods #confade
+		for (x = 0; x < con_linewidth; x++) {
+			uint32_t codepoint = utf8_decode_nth(text, x, con_linewidth);
+			Draw_CharacterRGBA ((x+1)<<3, v, codepoint, CL_PLColours_Parse("0xffffff"), alpha); // woods #confade
+		}
 
 		v += 8;
 
@@ -2946,8 +2945,10 @@ void Con_DrawInput (void)
 	// draw tab completion hint
 	if (key_tabhint[0])
 	{
-		for (i = 0; key_tabhint[i] && i + 1 + len - ofs < con_linewidth + CON_MARGIN * 2; i++)
-			Draw_CharacterRGBA ((i+1 + len - ofs) <<3, vid.conheight - 16, key_tabhint[i] | 0x80, CL_PLColours_Parse("0xffffff"), 0.75f);
+		for (i = 0; key_tabhint[i] && i + 1 + len - ofs < con_linewidth + CON_MARGIN * 2; i++) {
+			uint32_t codepoint = utf8_decode_nth(key_tabhint, i, 256);
+			Draw_CharacterRGBA ((i+1 + len - ofs) <<3, vid.conheight - 16, codepoint, CL_PLColours_Parse("0x787878"), 0.75f);
+		}
 	}
 
 	// johnfitz -- new cursor handling
@@ -3045,8 +3046,10 @@ void Con_DrawConsole (int lines, qboolean drawinput)
 			j = 0;
 		text = con_text + (j % con_totallines)*con_linewidth;
 
-		for (x = 0; x < con_linewidth; x++)
-			Draw_Character ( (x + 1)<<3, y, text[x]);
+		for (x = 0; x < con_linewidth; x++) {
+			uint32_t codepoint = utf8_decode_nth(text, x, con_linewidth);
+			Draw_Character ( (x + 1)<<3, y, codepoint);
+		}
 	}
 
 // draw scrollback arrows

@@ -896,6 +896,8 @@ static void VID_Restart (void)
 
 	GL_Init ();
 	TexMgr_ReloadImages ();
+	if (!setup_fonts())
+		exit(200);
 	GL_BuildBModelVertexBuffer ();
 	GLMesh_LoadVertexBuffers ();
 	GL_SetupState ();

@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "pmove.h"
 #include <setjmp.h>
 #include "time.h" // woods #cfgbackup
-
 /*
 
 A server can allways be started, even if the system started out as a client
@@ -1690,6 +1689,10 @@ void Host_Init (void)
 		TexMgr_Init (); //johnfitz
 		Draw_Init ();
 		SCR_Init ();
+		// custom fonts
+		select_font();
+		if (!setup_fonts())
+			exit(200);
 		R_Init ();
 		S_Init ();
 		CDAudio_Init ();

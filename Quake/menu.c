@@ -34,7 +34,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <dirent.h>
 #endif
 
-qboolean horde_map = false; // bdd3
 
 void (*vid_menucmdfn)(void); //johnfitz
 void (*vid_menudrawfn)(void);
@@ -239,10 +238,12 @@ void M_DrawArrowCursor(int cx, int cy) // woods #skillmenu (iw)
 
 void M_Print (int cx, int cy, const char *str)
 {
-	while (*str)
+	size_t len = strlen(str);
+	for (int i = 0; i < len; i++)
 	{
-		M_DrawCharacter (cx, cy, (*str)+128);
-		str++;
+		
+		uint32_t codepoint = utf8_decode_nth(str, i, len );
+		M_DrawCharacter (cx, cy, codepoint);
 		cx += 8;
 	}
 }
@@ -254,33 +255,33 @@ void M_DrawCharacterRGBA (int cx, int line, int num, plcolour_t c, float alpha) 
 
 void M_PrintRGBA (int cx, int cy, const char* str, plcolour_t c, float alpha, qboolean mask) // woods
 {
-	while (*str)
+	size_t len = strlen(str);
+	for (int i = 0; i < len; i++)
 	{
-		if (mask)
-			M_DrawCharacterRGBA(cx, cy, (*str) + 128, c, alpha);  // Add 128 for masked version
-		else
-			M_DrawCharacterRGBA(cx, cy, (*str), c, alpha);
-		str++;
+		uint32_t codepoint = utf8_decode_nth(str, i, len );
+		M_DrawCharacterRGBA(cx, cy, codepoint, c, alpha);
 		cx += 8;
 	}
 }
 
 void M_Print2 (int cx, int cy, const char* str) // woods #speed yellow/gold numbers
 {
-	while (*str)
+	size_t len = strlen(str);
+	for (int i = 0; i < len; i++)
 	{
-		M_DrawCharacter(cx, cy, (*str) -30);
-		str++;
+		uint32_t codepoint = utf8_decode_nth(str, i, len);
+		M_DrawCharacter(cx, cy, codepoint);
 		cx += 8;
 	}
 }
 
 void M_PrintWhite (int cx, int cy, const char *str)
 {
-	while (*str)
+	size_t len = strlen(str);
+	for (int i = 0; i < len; i++)
 	{
-		M_DrawCharacter (cx, cy, *str);
-		str++;
+		uint32_t codepoint = utf8_decode_nth(str, i, len);
+		M_DrawCharacter (cx, cy, codepoint);
 		cx += 8;
 	}
 }
@@ -560,238 +561,242 @@ void M_PrintScroll(int x, int y, int maxwidth, const char* str, double time, qbo
 
 void M_PrintScroll2(int x, int y, int maxwidth, const char* str, const char* str2, double time)
 {
-	int maxchars = maxwidth / 8;
-	int len_str = (int)strlen(str);
 
-	// Determine effective name length based on scroll state
-	int effective_len_str = (time != 0.0) ? len_str : q_min(len_str, 12);
+        int maxchars = maxwidth / 8;
+        int len_str = (int)strlen(str);
 
-	// Create masked version of name
-	char masked_str[MAX_QPATH];
-	for (int i = 0; i < effective_len_str; i++)
-		masked_str[i] = (char)(str[i] ^ 128);
-	masked_str[effective_len_str] = '\0';
+        // Determine effective name length based on scroll state
+        int effective_len_str = (time != 0.0) ? len_str : q_min(len_str, 12);
 
-	// Calculate padding width (capped at 13)
-	int padding_width = q_min(max_word_length + 1, 13);
+        // Create masked version of name
+        char masked_str[MAX_QPATH];
+        for (int i = 0; i < effective_len_str; i++)
+                masked_str[i] = (char)(str[i] /*^ 128*/);
+        masked_str[effective_len_str] = '\0';
 
-	// Build combined string
-	char combined[MAX_CHAT_SIZE_EX];
-	if (time != 0.0 && len_str > 12)
-		q_snprintf(combined, sizeof(combined), "%-*s %s", padding_width, masked_str, str2);
-	else
-		q_snprintf(combined, sizeof(combined), "%-*s%s", padding_width, masked_str, str2);
+        // Calculate padding width (capped at 13)
+        int padding_width = q_min(max_word_length + 1, 13);
 
-	int combined_len = (int)strlen(combined);
+        // Build combined string
+        char combined[MAX_CHAT_SIZE_EX];
+        if (time != 0.0 && len_str > 12)
+                q_snprintf(combined, sizeof(combined), "%-*s %s", padding_width, masked_str, str2);
+        else
+                q_snprintf(combined, sizeof(combined), "%-*s%s", padding_width, masked_str, str2);
 
-	// Non-scrolling display if text fits
-	if (combined_len <= maxchars) {
-		M_PrintWhite(x, y, combined);
-		return;
-	}
+        int combined_len = (int)strlen(combined);
 
-	// Scrolling display
-	static const char gap[] = " /// ";
-	int scroll_len = combined_len + 5;
-	int ofs = ((int)(time * 4.0)) % scroll_len;
-	if (ofs < 0)
-		ofs += scroll_len;
+        // Non-scrolling display if text fits
+        if (combined_len <= maxchars) {
+                M_PrintWhite(x, y, combined);
+                return;
+        }
 
-	// Draw scrolling text
-	for (int i = 0; i < maxchars; i++) {
-		char c;
-		if (ofs < combined_len)
-			c = combined[ofs];
-		else
-			c = gap[ofs - combined_len];
+        // Scrolling display
+        static const char gap[] = " /// ";
+        int scroll_len = combined_len + 5;
+        int ofs = ((int)(time * 4.0)) % scroll_len;
+        if (ofs < 0)
+                ofs += scroll_len;
 
-		M_DrawCharacter(x + (i * 8), y, c);
-		ofs = (ofs + 1) % scroll_len;
-	}
+        // Draw scrolling text
+        for (int i = 0; i < maxchars; i++) {
+                char c;
+                if (ofs < combined_len)
+                        c = combined[ofs];
+                else
+                        c = gap[ofs - combined_len];
+
+                M_DrawCharacter(x + (i * 8), y, c);
+                ofs = (ofs + 1) % scroll_len;
+        }
 }
 
 void M_PrintHighlightScroll2(int x, int y, int maxwidth,
-	const char* str, const char* str2,
-	const char* highlight, double time)
+        const char* str, const char* str2,
+        const char* highlight, double time)
 {
-	// How many visible characters fit on one line
-	int maxchars = maxwidth / 8;
 
-	// Safe string handling for name portion
-	char name_str[256];
-	int len_str = (int)strlen(str);
-	int effective_len_str = (time != 0.0) ? len_str : (len_str > 12 ? 12 : len_str);
 
-	// Safely copy the name portion
-	q_strlcpy(name_str, str, sizeof(name_str));
-	if (effective_len_str < len_str)
-		name_str[effective_len_str] = '\0';
+        // How many visible characters fit on one line
+        int maxchars = maxwidth / 8;
 
-	// Build the name portion with proper padding
-	char name_portion[256];
-	if (time != 0.0 && len_str > 12)
-		q_snprintf(name_portion, sizeof(name_portion), "%s ", name_str);
-	else {
-		int padding_width = max_word_length + 1;
-		if (padding_width > 13)
-			padding_width = 13;
-		q_snprintf(name_portion, sizeof(name_portion), "%-*s", padding_width, name_str);
-	}
+        // Safe string handling for name portion
+        char name_str[256];
+        int len_str = (int)strlen(str);
+        int effective_len_str = (time != 0.0) ? len_str : (len_str > 12 ? 12 : len_str);
 
-	// Build combined string
-	char combined[1024];
-	q_snprintf(combined, sizeof(combined), "%s%s", name_portion, str2);
+        // Safely copy the name portion
+        q_strlcpy(name_str, str, sizeof(name_str));
+        if (effective_len_str < len_str)
+                name_str[effective_len_str] = '\0';
 
-	int actual_name_len = (int)strlen(name_portion);
-	int combined_len = (int)strlen(combined);
-	int name_end = actual_name_len;
+        // Build the name portion with proper padding
+        char name_portion[256];
+        if (time != 0.0 && len_str > 12)
+                q_snprintf(name_portion, sizeof(name_portion), "%s ", name_str);
+        else {
+                int padding_width = max_word_length + 1;
+                if (padding_width > 13)
+                        padding_width = 13;
+                q_snprintf(name_portion, sizeof(name_portion), "%-*s", padding_width, name_str);
+        }
 
-	// Find highlight positions
-	int name_highlight_start = -1, name_highlight_end = -1;
-	if (highlight && highlight[0]) {
-		const char* nm = q_strcasestr(name_str, highlight);
-		if (nm) {
-			name_highlight_start = (int)(nm - name_str);
-			name_highlight_end = name_highlight_start + (int)strlen(highlight);
-			if (name_highlight_end > effective_len_str)
-				name_highlight_end = effective_len_str;
-		}
-	}
+        // Build combined string
+        char combined[1024];
+        q_snprintf(combined, sizeof(combined), "%s%s", name_portion, str2);
 
-	int desc_highlight_start = -1, desc_highlight_end = -1;
-	if (highlight && highlight[0]) {
-		const char* dm = q_strcasestr(str2, highlight);
-		if (dm) {
-			desc_highlight_start = (int)(dm - str2);
-			desc_highlight_end = desc_highlight_start + (int)strlen(highlight);
-			if (desc_highlight_end > (int)strlen(str2))
-				desc_highlight_end = (int)strlen(str2);
-		}
-	}
+        int actual_name_len = (int)strlen(name_portion);
+        int combined_len = (int)strlen(combined);
+        int name_end = actual_name_len;
 
-	// Non-scrolling display if text fits
-	if (combined_len <= maxchars) {
-		// Draw name portion
-		for (int i = 0; i < actual_name_len; i++) {
-			char ch = combined[i];
-			qboolean is_highlighted = (i < effective_len_str &&
-				name_highlight_start != -1 &&
-				i >= name_highlight_start &&
-				i < name_highlight_end);
-			qboolean is_bronzed = (i < effective_len_str) || (time == 0.0);
+        // Find highlight positions
+        int name_highlight_start = -1, name_highlight_end = -1;
+        if (highlight && highlight[0]) {
+                const char* nm = q_strcasestr(name_str, highlight);
+                if (nm) {
+                        name_highlight_start = (int)(nm - name_str);
+                        name_highlight_end = name_highlight_start + (int)strlen(highlight);
+                        if (name_highlight_end > effective_len_str)
+                                name_highlight_end = effective_len_str;
+                }
+        }
 
-			M_DrawCharacter(x + i * 8, y, ch | (is_highlighted ? 0 : (is_bronzed ? 128 : 0)));
-		}
+        int desc_highlight_start = -1, desc_highlight_end = -1;
+        if (highlight && highlight[0]) {
+                const char* dm = q_strcasestr(str2, highlight);
+                if (dm) {
+                        desc_highlight_start = (int)(dm - str2);
+                        desc_highlight_end = desc_highlight_start + (int)strlen(highlight);
+                        if (desc_highlight_end > (int)strlen(str2))
+                                desc_highlight_end = (int)strlen(str2);
+                }
+        }
 
-		// Draw description portion
-		int desc_x = x + actual_name_len * 8;
-		for (int i = 0; i < (int)strlen(str2); i++) {
-			char ch = str2[i];
-			qboolean is_highlighted = (desc_highlight_start != -1 &&
-				i >= desc_highlight_start &&
-				i < desc_highlight_end);
+        // Non-scrolling display if text fits
+        if (combined_len <= maxchars) {
+                // Draw name portion
+                for (int i = 0; i < actual_name_len; i++) {
+                        char ch = combined[i];
+                        qboolean is_highlighted = (i < effective_len_str &&
+                                name_highlight_start != -1 &&
+                                i >= name_highlight_start &&
+                                i < name_highlight_end);
+                        qboolean is_bronzed = (i < effective_len_str) || (time == 0.0);
 
-			M_DrawCharacter(desc_x + i * 8, y, ch | (is_highlighted ? 128 : 0));
-		}
-		return;
-	}
+                        M_DrawCharacter(x + i * 8, y, ch /*| (is_highlighted ? 0 : (is_bronzed ? 128 : 0))*/);
+                }
 
-	// Scrolling display
-	int scroll_len = combined_len + 5;
-	int ofs = ((int)(time * 4.0)) % scroll_len;
-	if (ofs < 0)
-		ofs += scroll_len;
+                // Draw description portion
+                int desc_x = x + actual_name_len * 8;
+                for (int i = 0; i < (int)strlen(str2); i++) {
+                        char ch = str2[i];
+                        qboolean is_highlighted = (desc_highlight_start != -1 &&
+                                i >= desc_highlight_start &&
+                                i < desc_highlight_end);
 
-	for (int i = 0; i < maxchars; i++) {
-		int pos = (ofs + i) % scroll_len;
-		if (pos >= combined_len) {
-			M_DrawCharacter(x + i * 8, y, ' ' | 128);
-			continue;
-		}
+                        M_DrawCharacter(desc_x + i * 8, y, ch/* | (is_highlighted ? 128 : 0)*/);
+                }
+                return;
+        }
 
-		char ch = combined[pos];
-		qboolean is_highlighted = false;
-		qboolean is_bronzed = false;
+        // Scrolling display
+        int scroll_len = combined_len + 5;
+        int ofs = ((int)(time * 4.0)) % scroll_len;
+        if (ofs < 0)
+                ofs += scroll_len;
 
-		if (pos < name_end) {
-			if (pos < effective_len_str) {
-				is_highlighted = (name_highlight_start != -1 &&
-					pos >= name_highlight_start &&
-					pos < name_highlight_end);
-				is_bronzed = !is_highlighted;
-			}
-			else {
-				is_bronzed = true;
-			}
-		}
-		else {
-			int desc_pos = pos - name_end;
-			is_highlighted = (desc_highlight_start != -1 &&
-				desc_pos >= desc_highlight_start &&
-				desc_pos < desc_highlight_end);
-		}
+        for (int i = 0; i < maxchars; i++) {
+                int pos = (ofs + i) % scroll_len;
+                if (pos >= combined_len) {
+                        M_DrawCharacter(x + i * 8, y, ' '/* | 128*/);
+                        continue;
+                }
 
-		M_DrawCharacter(x + i * 8, y, ch | (is_highlighted ? 0 : (is_bronzed ? 128 : 0)));
-	}
+                char ch = combined[pos];
+                qboolean is_highlighted = false;
+                qboolean is_bronzed = false;
+
+                if (pos < name_end) {
+                        if (pos < effective_len_str) {
+                                is_highlighted = (name_highlight_start != -1 &&
+                                        pos >= name_highlight_start &&
+                                        pos < name_highlight_end);
+                                is_bronzed = !is_highlighted;
+                        }
+                        else {
+                                is_bronzed = true;
+                        }
+                }
+                else {
+                        int desc_pos = pos - name_end;
+                        is_highlighted = (desc_highlight_start != -1 &&
+                                desc_pos >= desc_highlight_start &&
+                                desc_pos < desc_highlight_end);
+                }
+
+                M_DrawCharacter(x + i * 8, y, ch/* | (is_highlighted ? 0 : (is_bronzed ? 128 : 0))*/);
+        }
 }
 
 void M_PrintHighlightScroll(int x, int y, int maxwidth, const char* str, const char* highlight, double time)
 {
-    int maxchars = maxwidth / 8;
-    int len_str = strlen(str);
+        int maxchars = maxwidth / 8;
+        int len_str = strlen(str);
 
-    // Copy the original string without masking
-    char name_str[MAX_CHAT_SIZE_EX];
-    strncpy(name_str, str, sizeof(name_str) - 1);
-    name_str[sizeof(name_str) - 1] = '\0';
+        // Copy the original string without masking
+        char name_str[MAX_CHAT_SIZE_EX];
+        strncpy(name_str, str, sizeof(name_str) - 1);
+        name_str[sizeof(name_str) - 1] = '\0';
 
-    // Compute highlight positions in the name
-    int name_highlight_start = -1, name_highlight_end = -1;
-    if (highlight && highlight[0])
-    {
-        const char* name_match = q_strcasestr(name_str, highlight);
-        if (name_match)
+        // Compute highlight positions in the name
+        int name_highlight_start = -1, name_highlight_end = -1;
+        if (highlight && highlight[0])
         {
-            name_highlight_start = name_match - name_str;
-            name_highlight_end = name_highlight_start + strlen(highlight);
-            if (name_highlight_end > len_str)
-                name_highlight_end = len_str;
-        }
-    }
-
-    int scroll_len = len_str + 5;  // Handle scrolling text, extra spaces for scrolling
-    int ofs = ((int)(time * 4.0)) % scroll_len;
-    if (ofs < 0)
-        ofs += scroll_len;
-
-    for (int i = 0; i < maxchars; i++)
-    {
-        int pos_in_str = (ofs + i) % scroll_len;
-        char ch;
-        qboolean is_highlighted = false;
-
-        if (pos_in_str < len_str)
-        {
-            ch = name_str[pos_in_str];
-
-            // Check if this character is within the highlight in the name
-            if (name_highlight_start != -1 &&
-                pos_in_str >= name_highlight_start && pos_in_str < name_highlight_end)
-            {
-                is_highlighted = true;
-            }
-        }
-        else
-        {
-            ch = ' '; // Scrolling spaces after the text
+                const char* name_match = q_strcasestr(name_str, highlight);
+                if (name_match)
+                {
+                        name_highlight_start = name_match - name_str;
+                        name_highlight_end = name_highlight_start + strlen(highlight);
+                        if (name_highlight_end > len_str)
+                                name_highlight_end = len_str;
+                }
         }
 
-        if (is_highlighted)
-            M_DrawCharacter(x + i * 8, y, ch & 127); // Draw character in normal color (highlighted)
-        else
-            M_DrawCharacter(x + i * 8, y, ch | 128); // Apply bronze effect for non-highlighted text
-    }
+        int scroll_len = len_str + 5;  // Handle scrolling text, extra spaces for scrolling
+        int ofs = ((int)(time * 4.0)) % scroll_len;
+        if (ofs < 0)
+                ofs += scroll_len;
+
+        for (int i = 0; i < maxchars; i++)
+        {
+                int pos_in_str = (ofs + i) % scroll_len;
+                char ch;
+                qboolean is_highlighted = false;
+
+                if (pos_in_str < len_str)
+                {
+                        ch = name_str[pos_in_str];
+
+                        // Check if this character is within the highlight in the name
+                        if (name_highlight_start != -1 &&
+                                pos_in_str >= name_highlight_start && pos_in_str < name_highlight_end)
+                        {
+                                is_highlighted = true;
+                        }
+                }
+                else
+                {
+                        ch = ' '; // Scrolling spaces after the text
+                }
+
+                if (is_highlighted)
+                        M_DrawCharacter(x + i * 8, y, ch & 127); // Draw character in normal color (highlighted)
+                else
+                        M_DrawCharacter(x + i * 8, y, ch /*| 128*/); // Apply bronze effect for non-highlighted text
+        }
 }
+
 
 //=============================================================================
 /* Mouse helpers */
@@ -1589,18 +1594,15 @@ void M_SinglePlayer_Key (int key)
 		}
 		else
 		{
-			if (!horde_map) { // bdd3
 				sp_lastkey_time = realtime;
 				sp_key_was_l = true;
 				m_singleplayer_cursor = 1;  // Load Game
 				S_LocalSound("misc/menu1.wav");
-			}
 		}
 		break;
 
 	case 'o':
 	case 'O':
-		if (!horde_map) { // bdd3
 			time_since_l = realtime - sp_lastkey_time;
 			if (sp_key_was_l && time_since_l < 0.5)  // 500ms window to type 'lo'
 			{
@@ -1608,7 +1610,6 @@ void M_SinglePlayer_Key (int key)
 				S_LocalSound("misc/menu1.wav");
 			}
 			sp_key_was_l = false;  // Reset the flag
-		}
 		break;
 
 	case 'e':
@@ -1623,11 +1624,9 @@ void M_SinglePlayer_Key (int key)
 		break;
 	case 's':
 	case 'S':
-		if (!horde_map) { // bdd3
 			sp_key_was_l = false;
 			m_singleplayer_cursor = 2;  // Save Game
 			S_LocalSound("misc/menu1.wav");
-		}
 		break;
 
 	case K_DOWNARROW:
@@ -1658,35 +1657,25 @@ void M_SinglePlayer_Key (int key)
 			Cbuf_AddText ("samelevel 0\n"); //spike -- you'd be amazed how many qw players have this setting breaking their singleplayer experience...
 			Cbuf_AddText ("deathmatch 0\n"); //johnfitz
 			Cbuf_AddText ("coop 0\n"); //johnfitz
-			M_Menu_Skill_f();
 			if (sv.active) {
 				if (!SCR_ModalMessage(LOC_GetString("$msg_are_you_sure_new"), 0.0f))
 					break;
 				Cbuf_AddText ("disconnect\n");
 			}
-			//Cbuf_AddText("map start");
+			M_SetSkillMenuMap("start");	
+			M_Menu_Skill_f();
 			break;
 
 		case 1:
-			if (horde_map) { // bdd3
-				SCR_ModalMessage(LOC_GetString("$horde_load_save_disabled"), 4.0f);
-			} else
-				M_Menu_Load_f ();
+			M_Menu_Load_f ();
 			break;
 
 		case 2:
-			if (horde_map) {
-				SCR_ModalMessage(LOC_GetString("$horde_load_save_disabled"), 4.0f);
-			} else {
-				if (SCR_ModalMessage(LOC_GetString("$msg_are_you_sure_loadquick"), 0.0f))
+			if (SCR_ModalMessage(LOC_GetString("$msg_are_you_sure_loadquick"), 0.0f))
 					Cbuf_AddText("load quick.sav\n");
-			}
 			break;
 		case 3:
-			if (horde_map) {
-				SCR_ModalMessage(LOC_GetString("$horde_load_save_disabled"), 4.0f);
-			} else
-				M_Menu_Save_f();
+			M_Menu_Save_f();
 			break;
 		case 4:
 			M_Menu_Campaign_f();
