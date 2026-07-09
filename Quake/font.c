@@ -122,25 +122,6 @@ uint32_t utf8_decode_nth(const char* input,
  * Returns a pointer to a buffer containing the UTF-8 string.
  * The buffer is reused on subsequent calls, so use the result immediately or copy it.
  */
-char* to_utf8(const char* str) {
-	if (!str) return NULL;
-	/*char* utf8_buf = get_utf8_buffer();
-	size_t fucksake = 1024;
-	size_t len = strlen(str);
-	wchar_t wide_str[1024];
-	SDL_iconv_t desc = SDL_iconv_open("WCHAR_T", "UTF-8");
-	size_t wide_len = SDL_iconv(desc, &str, &len, (char **)&wide_str, &fucksake);
-	if (wide_len == 0 || wide_len > 1024) {
-		utf8_buf[0] = '\0';
-		return utf8_buf;
-	}
-	SDL_iconv_t newdesc = SDL_iconv_open("UTF-8", "WCHAR_T");
-
-	SDL_iconv(newdesc, (const char **)&wide_str, &wide_len, &utf8_buf, &fucksake);
-	return utf8_buf;*/
-	return str;
-}
-
 
 void get_texture_data(GLuint textureID, SDL_Surface** surface)
 {
@@ -323,7 +304,7 @@ int generate_font_pngs(void)
 					}
 
 					const char* font_filename = va("%s/id1/fonts/font%i.ttf",
-						to_utf8(com_basedir),
+						com_basedir,
 						font_index);
 					font = TTF_OpenFont(font_filename, FONT_SIZE);
 					if (!font)
