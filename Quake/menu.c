@@ -1295,52 +1295,48 @@ void M_Menu_Main_f (void)
 
 void M_Main_Draw (void) // woods #modsmenu #demosmenu (iw)
 {
-	int cursor, f;
-	qpic_t* p;
+	
 
 	M_DrawTransPic(16, 4, Draw_CachePic("gfx/qplaque.lmp"));
-	p = Draw_CachePic("gfx/ttl_main.lmp");
-	M_DrawPic((320 - p->width) / 2, 4, p);
 
-	p = Draw_CachePic("gfx/mainmenu.lmp");
-	int split = 60;
-	int offset = 0;
-
-	if (m_main_mods && m_main_demos) // both mods and demos
-	{
-		M_DrawSubpic(72, 32, p, 0, 0, p->width, split);
-		M_DrawTransPic(72, 32 + split, Draw_CachePic("gfx/menumods.lmp"));
-		M_DrawTransPic(72, 52 + split, Draw_CachePic("gfx/menudemos.lmp"));
-		M_DrawSubpic(72, 72 + split, p, 0, split, p->width, p->height - split);
-	}
+	const double scale = 1.5;
+	const double invScale = 1.0 / scale;
+	glPushMatrix();
+	glScalef(scale, scale, scale);
+	int x = 72;
+	int y = 32;
 	
-	else if (m_main_mods && !m_main_demos) // only mods
-	{
-		M_DrawSubpic(72, 32 + offset, p, 0, 0, p->width, split);
-		M_DrawTransPic(72, 32 + offset + split, Draw_CachePic("gfx/menumods.lmp"));
-		M_DrawSubpic(72, 32 + offset + split + 20, p, 0, split, p->width, p->height - split);
-		offset += split + 20; // Adjust offset if needed for further items
-	}
+	M_Print(x * invScale, y * invScale, LOC_GetString("$menu_single_player")); y += 20;
+        M_Print(x * invScale, y * invScale, LOC_GetString("$menu_multiplayer")); y += 20;
+        M_Print(x * invScale, y * invScale, LOC_GetString("$menu_options")); y += 20;
 
-	else if (m_main_demos && !m_main_mods) // only demos
-	{
-		M_DrawSubpic(72, 32 + offset, p, 0, 0, p->width, split);
-		M_DrawTransPic(72, 32 + offset + split, Draw_CachePic("gfx/menudemos.lmp"));
-		M_DrawSubpic(72, 32 + offset + split + 20, p, 0, split, p->width, p->height - split);
-		offset += split + 20; // Adjust offset if needed for further items
-	}
+        if (m_main_mods && m_main_demos) // both mods and demos
+        {
+                M_Print(x * invScale, y * invScale, LOC_GetString("$menu_mods")); y += 20;
+                M_Print(x * invScale, y * invScale, LOC_GetString("$menu_demos")); y += 20;
+        }
+        else if (m_main_mods && !m_main_demos) // only mods
+        {
+                M_Print(x * invScale, y * invScale, LOC_GetString("$menu_mods")); y += 20;
+        }
+        else if (m_main_demos && !m_main_mods) // only demos
+        {
+                M_Print(x * invScale, y * invScale, LOC_GetString("$menu_demos")); y += 20;
+        }
 
-	else
-		M_DrawTransPic(72, 32, Draw_CachePic("gfx/mainmenu.lmp")); // neither mods nor demos
+//	M_Print(x * invScale, y * invScale, LOC_GetString("$menu_lore")); y += 20;
+	M_Print(x * invScale, y * invScale, LOC_GetString("$menu_how_to_play")); y += 20;
+        M_Print(x * invScale, y * invScale, LOC_GetString("$menu_quit")); y += 20;
 
+	glPopMatrix();
+	int cursor, f;
 	f = (int)(realtime * 10) % 6;
 	cursor = m_main_cursor;
 
-	// Adjust cursor position based on mods and demos activation
 	if (!m_main_mods && cursor > MAIN_MODS) cursor--;
 	if (!m_main_demos && cursor >= MAIN_DEMOS) cursor--;
 
-	M_DrawTransPic(54, 32 + cursor * 20, Draw_CachePic(va("gfx/menudot%i.lmp", f + 1)));
+	M_DrawTransPic(44, 24 + cursor * 20, Draw_CachePic(va("gfx/menudot%i.lmp", f + 1)));
 }
 
 static double m_lastkey_time;
@@ -2538,17 +2534,35 @@ void M_MultiPlayer_Draw (void)
 	int		f, i; // woods
 	qpic_t	*p;
 
+	const char *title = LOC_GetString("$menu_multiplayer");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
-	p = Draw_CachePic ("gfx/p_multi.lmp");
-	M_DrawPic ( (320-p->width)/2, 4, p);
-	M_DrawTransPic (72, 32, Draw_CachePic ("gfx/mp_menu.lmp") );
+	//M_DrawTransPic (72, 32, Draw_CachePic ("gfx/mp_menu.lmp") );
+	
+	const double scale = 1.5;
+        const double invScale = 1.0 / scale;
+
+        glPushMatrix();
+        glScalef(scale, scale, scale);
+
+        int x = 72;
+        int y = 32;
+
+        int cursor;
+
+        M_Print(x * invScale, y * invScale, LOC_GetString("$menu_join_a_game")); y += 20;
+        M_Print(x * invScale, y * invScale, LOC_GetString("$menu_new_game")); y += 20;
+        M_Print(x * invScale, y * invScale, LOC_GetString("$menu_setup")); y += 20;
+
+        glPopMatrix();
 
 	f = (int)(realtime * 10)%6;
 	i = 24;
 	if (strlen(lastmphost) > i)
 		i = (strlen(lastmphost));
-
-	M_DrawTransPic (54, 32 + m_multiplayer_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 ) ) );
+	cursor = m_multiplayer_cursor;
+	
+	M_DrawTransPic (44, 24 + m_multiplayer_cursor * 20,Draw_CachePic( va("gfx/menudot%i.lmp", f+1 ) ) );
 
 	
 	if (cl.maxclients > 1 && cls.state == ca_connected && !cls.demoplayback) // woods, give some extra info in mp menu
@@ -2566,7 +2580,7 @@ void M_MultiPlayer_Draw (void)
 
 	if (ipxAvailable || ipv4Available || ipv6Available)
 		return;
-	M_PrintWhite ((320/2) - ((27*8)/2), 148, "No Communications Available");
+	M_PrintWhite ((320/2) - ((27*8)/2), 148, "$menu_no_comm_avail");
 }
 
 
