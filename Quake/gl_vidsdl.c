@@ -2793,22 +2793,18 @@ static void VID_MenuDraw (void)
 {
 	int i, y;
 	qpic_t *p;
-	const char *title;
+	const char *title2;
 
 	y = 4;
 
-	// plaque
-	p = Draw_CachePic ("gfx/qplaque.lmp");
-	M_DrawTransPic (16, y, p);
-
-	p = Draw_CachePic ("gfx/p_option.lmp");
-	M_DrawPic ( (320-p->width)/2, y, p);
+	const char* title = LOC_GetString("$menu_options");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
 	y += 28;
 
 	// title
-	title = "Video Options";
-	M_PrintWhite ((320-8*strlen(title))/2, y, title);
+	title2 = "Video Options";
+	M_PrintWhite ((320-8*strlen(title2))/2, y, title2);
 
 	y += 16;
 

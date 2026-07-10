@@ -1872,8 +1872,8 @@ void M_Menu_Save_f (void)
 
 static void M_DrawSaveSlots (const char* title_pic)
 {
-	qpic_t* p = Draw_CachePic(title_pic);
-	M_DrawPic((320 - p->width) / 2, 4, p);
+	/*qpic_t* p = Draw_CachePic(title_pic);
+	M_DrawPic((320 - p->width) / 2, 4, p);*/
 
 	for (int i = 0; i < MAX_SAVEGAMES - 1; i++)
 	{
@@ -1898,11 +1898,15 @@ static void M_DrawSaveSlots (const char* title_pic)
 
 void M_Load_Draw (void)
 {
+	const char* title = LOC_GetString("$menu_load_game");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 	M_DrawSaveSlots ("gfx/p_load.lmp");
 }
 
 void M_Save_Draw (void)
 {
+	const char* title = LOC_GetString("$menu_save_game");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 	M_DrawSaveSlots ("gfx/p_save.lmp");
 }
 
@@ -2873,9 +2877,9 @@ void M_Setup_Draw (void)
 	}
 
 	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
-	p = Draw_CachePic ("gfx/p_multi.lmp");
-	M_DrawPic ( (320-p->width)/2, 4, p);
-
+	const char* title = LOC_GetString("$menu_multiplayer");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
+	
 	M_Print (64, 40, "Hostname");
 	M_DrawTextBox (160, 32, 16, 1);
 	M_Print (168, 40, setup_hostname);
@@ -3430,9 +3434,8 @@ void M_Net_Draw (void)
 	qpic_t	*p;
 
 	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
-	p = Draw_CachePic ("gfx/p_multi.lmp");
-	M_DrawPic ( (320-p->width)/2, 4, p);
-
+	const char* title = LOC_GetString("$menu_multiplayer");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 	f = 32;
 
 	/*if (ipxAvailable)   // woods this is not needed
@@ -3696,8 +3699,8 @@ void M_Options_Draw (void)
 		M_ReleaseSliderGrab();
 
 	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
-	p = Draw_CachePic ("gfx/p_option.lmp");
-	M_DrawPic ( (320-p->width)/2, 4, p);
+	const char* title = LOC_GetString("$menu_options");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
 	// Draw menu items with search highlighting if active
 	for (int i = 0; i < OPTIONS_ITEMS; i++)
@@ -4347,8 +4350,8 @@ void M_Keys_Draw(void)
 	int firstvis, numvis, x, y, cols;
 	qpic_t* p;
 
-	p = Draw_CachePic("gfx/ttl_cstm.lmp");
-	M_DrawPic((320 - p->width) / 2, 4, p);
+	const char* title = LOC_GetString("$menu_customize");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 	if (bind_grab)
 		M_Print(12, 32, "press a key or button for this action");
 	else
@@ -4752,11 +4755,11 @@ void M_Mouse_Draw(void)
 	float r;
 	enum mouse_e i;
 
-	p = Draw_CachePic("gfx/p_option.lmp");
-	M_DrawPic((320 - p->width) / 2, 4, p);
+	const char* title = LOC_GetString("$menu_options");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
-	const char* title = "Mouse Options";
-	M_PrintWhite((320 - 8 * strlen(title)) / 2, 32, title);
+	const char* title2 = "Mouse Options";
+	M_PrintWhite((320 - 8 * strlen(title2)) / 2, 32, title2);
 
 	for (i = 0; i < MOUSE_ITEMS; i++)
 	{
@@ -5336,11 +5339,11 @@ void M_Graphics_Draw(void)
 	float r;
 	int m;
 
-	p = Draw_CachePic("gfx/p_option.lmp");
-	M_DrawPic((320 - p->width) / 2, 4, p);
+	const char* title = LOC_GetString("$menu_options");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
-	const char* title = "Graphics Options";
-	M_PrintWhite((320 - 8 * strlen(title)) / 2, 32, title);
+	const char* title2 = "Graphics Options";
+	M_PrintWhite((320 - 8 * strlen(title2)) / 2, 32, title2);
 
 	for (i = 0; i < GRAPHICS_ITEMS; i++)
 	{
@@ -5966,11 +5969,11 @@ void M_Sound_Draw(void)
 	qpic_t* p;
 	enum sound_e i;
 
-	p = Draw_CachePic("gfx/p_option.lmp");
-	M_DrawPic((320 - p->width) / 2, 4, p);
+	const char* title = LOC_GetString("$menu_options");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
-	const char* title = "Sound Options";
-	M_PrintWhite((320 - 8 * strlen(title)) / 2, 32, title);
+	const char* title2 = LOC_GetString("$menu_sound_options");
+	M_PrintWhite((320 - 8 * strlen(title2)) / 2, 32, title2);
 
 	for (i = 0; i < SOUND_ITEMS; i++)
 	{
@@ -5982,62 +5985,62 @@ void M_Sound_Draw(void)
 		switch (i)
 		{
 		case SOUND_VOLUME:
-			text = "      Sound Volume";
+			text = LOC_GetString("$menu_sound_volume_indented");
 			r = sfxvolume.value;
 			M_DrawSlider(186, y, r, 100.f * sfxvolume.value, "%.0f%%");
 			break;
 
 		case SOUND_MUSICVOL:
-			text = "      Music Volume";
+			text = LOC_GetString("$menu_music_volume_indented");
 			r = bgmvolume.value;
 			M_DrawSlider(186, y, r, 100.f * bgmvolume.value, "%.0f%%");
 			break;
 
 		case SOUND_MUSICEXT:
-			text = "    External Music";
+			text = LOC_GetString("$menu_external_music_indented");
 			M_DrawCheckbox(178, y, bgm_extmusic.value);
 			break;
 
 		case SOUND_AUDIORATE:
-			text = "        Audio Rate";
+			text = LOC_GetString("$menu_audio_rate_indented");
 			if (snd_mixspeed.value == 48000)
-				value = "48000 hz (DVD)";
+				value = LOC_GetString("$menu_audio_rate_dvd");
 			else if (snd_mixspeed.value == 44100)
-				value = "44100 hz (CD)";
+				value = LOC_GetString("$menu_audio_rate_cd");
 			else if (snd_mixspeed.value == 22050)
-				value = "22050 hz (Midrange)";
+				value = LOC_GetString("$menu_audio_rate_midrange");
 			else if (snd_mixspeed.value == 11025)
-				value = "11025 hz (WinQuake)";
+				value = LOC_GetString("$menu_audio_rate_winquake");
 			else
-				value = va("%i hz", (int)snd_mixspeed.value);
+				value = va(LOC_GetString("$menu_audio_rate_generic"), (int)snd_mixspeed.value);
 			if (value)
 				M_Print(178, y, value);
 			break;
 
 		case SOUND_WATERFX:
-			text = "          Water FX";
+			text = LOC_GetString("$menu_water_fx_indented");
 			r = snd_waterfx.value;
 			M_DrawSlider(186, y, r, 100.f * snd_waterfx.value, "%.0f%%");
 			break;
 
 		case SOUND_AMBIENTLEVEL:
-			text = "     Ambient Level";
+			text = LOC_GetString("$menu_ambient_level_indented");
 			r = ambient_level.value;
 			M_DrawSlider(186, y, r, 100.f * ambient_level.value, "%.0f%%");
 			break;
 
 		case SOUND_STOPSOUND:
-			text = "        Stop Sound";
+			text = LOC_GetString("$menu_stop_sound_indented");
 			M_DrawCheckbox(178, y, cl_ambient.value);
 			break;
 		case SOUND_MUTE:
 		{
-			text = "              Mute";
+			text = LOC_GetString("$menu_mute_indented");
 			// If mute is 'y', sound is off. If 'n' or anything else, sound is on
 			if (mute[0] == 'y')
-				M_Print(178, y, "on");
+				M_Print(178, y, LOC_GetString("$menu_on"));
 			else
-				M_Print(178, y, "off");
+				M_Print(178, y, LOC_GetString("$menu_off"));
 		}
 		break;
 
@@ -7402,11 +7405,11 @@ void M_HUD_Draw(void)
 	float r, l;
 	const char* value;
 
-	p = Draw_CachePic("gfx/p_option.lmp");
-	M_DrawPic((320 - p->width) / 2, 4, p);
+	const char* title = LOC_GetString("$menu_options");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
-	const char* title = "HUD Options";
-	M_PrintWhite((320 - 8 * strlen(title)) / 2, 32, title);
+	const char* title2 = LOC_GetString("$menu_hud_options");
+	M_PrintWhite((320 - 8 * strlen(title2)) / 2, 32, title2);
 
 	for (int i = 0; i < HUD_ITEMS; i++)
 	{
@@ -7416,119 +7419,119 @@ void M_HUD_Draw(void)
 		switch (i)
 		{
 		case HUD_CROSSHAIR:
-			text = "         Crosshair";
-			M_Print(178, y-2, "...");
-			break;
-		case HUD_SCALE:
-			text = "         HUD Scale";
-			l = (vid.width / 320.0) - 1;
-			r = l > 0 ? (scr_sbarscale.value - 1) / l : 0;  // Changed from conscale to sbarscale
-			if (hud_slider_grab && hud_cursor == HUD_SCALE)
-				r = target_hud_scale_frac;
-			M_DrawSlider(186, y, r, scr_sbarscale.value, "%.1f");  // Changed from conscale to sbarscale
-			break;
+			text = LOC_GetString("$menu_crosshair_indented");
+                        M_Print(178, y - 2, LOC_GetString("$menu_crosshair_value_placeholder"));
+                        break;
+                case HUD_SCALE:
+                        text = LOC_GetString("$menu_hud_scale_indented");
+                        l = (vid.width / 320.0) - 1;
+                        r = l > 0 ? (scr_sbarscale.value - 1) / l : 0;
+                        if (hud_slider_grab && hud_cursor == HUD_SCALE)
+                                r = target_hud_scale_frac;
+                        M_DrawSlider(186, y, r, scr_sbarscale.value, "%.1f");
+                        break;
 
-		case HUD_SCRSIZE:
-			text = "       Screen Size";
-			r = (scr_viewsize.value - 30) / (130 - 30);
-			M_DrawSlider(186, y, r, scr_viewsize.value, "%.0f");
-			break;
+                case HUD_SCRSIZE:
+                        text = LOC_GetString("$menu_screen_size_indented");
+                        r = (scr_viewsize.value - 30) / (110 - 30);
+                        M_DrawSlider(186, y, r, scr_viewsize.value, "%.0f");
+                        break;
 
-		case HUD_SBALPHA:
-			text = "   Statusbar Alpha";
-			r = (1.0 - scr_sbaralpha.value);
-			M_DrawSlider(186, y, r, 100.0f * r, "%.0f%%");
-			break;
+                case HUD_SBALPHA:
+                        text = LOC_GetString("$menu_statusbar_alpha_indented");
+                        r = (1.0 - scr_sbaralpha.value);
+                        M_DrawSlider(186, y, r, 100.0f * r, "%.0f%%");
+                        break;
 
-		case HUD_SBARSTYLE:
-			text = "  Status Bar Style";
-			switch ((int)scr_sbar.value)
-			{
-			case 1: value = "classic"; break;
-			case 2: value = "quakeworld"; break;
-			case 3: value = "modern/remaster"; break;
-			default: value = "unknown"; break;
-			}
-			M_Print(178, y, value);
-			break;
+                case HUD_SBARSTYLE:
+                        text = LOC_GetString("$menu_status_bar_style_indented");
+                        switch ((int)scr_sbar.value)
+                        {
+                        case 1: value = LOC_GetString("$menu_classic"); break;
+                        case 2: value = LOC_GetString("$menu_quakeworld"); break;
+                        case 3: value = LOC_GetString("$menu_modern_remaster"); break;
+                        default: value = LOC_GetString("$menu_unknown"); break;
+                        }
+                        M_Print(178, y, value);
+                        break;
 
-		case HUD_SHOWFPS:
-			text = "          Show FPS";
-			M_DrawCheckbox(178, y, scr_showfps.value);
-			break;
+                case HUD_SHOWFPS:
+                        text = LOC_GetString("$menu_show_fps_indented");
+                        M_DrawCheckbox(178, y, scr_showfps.value);
+                        break;
 
-		case HUD_MATCHSCORES:
-			text = " Show Match Scores";
-			M_DrawCheckbox(178, y, scr_match_hud.value);
-			break;
+                case HUD_MATCHSCORES:
+                        text = LOC_GetString("$menu_show_match_scores_indented");
+                        M_DrawCheckbox(178, y, scr_match_hud.value);
+                        break;
 
-		case HUD_MATCHCLOCK:
-			text = "       Match Clock";
-			M_DrawCheckbox(178, y, scr_matchclock.value);
-			break;
+                case HUD_MATCHCLOCK:
+                        text = LOC_GetString("$menu_match_clock_indented");
+                        M_DrawCheckbox(178, y, scr_matchclock.value);
+                        break;
 
-		case HUD_SHOWPING:
-			text = "         Show Ping";
-			M_DrawCheckbox(178, y, scr_ping.value);
-			break;
+                case HUD_SHOWPING:
+                        text = LOC_GetString("$menu_show_ping_indented");
+                        M_DrawCheckbox(178, y, scr_ping.value);
+                        break;
 
-		case HUD_SHOWCLOCK:
-			text = "        Show Clock";
-			switch ((int)scr_clock.value)
-			{
-			case 0: value = "off"; break;
-			case 1: value = "level time"; break;
-			case 2: value = "12hr clock"; break;
-			case 3: value = "24hr clock"; break;
-			case 4: value = "date only"; break;
-			case 5: value = "date + 12hr"; break;
-			case 6: value = "date + 24hr"; break;
-			case 7: value = "score/12hr"; break;
-			case 8: value = "score/24hr"; break;
-			default: value = "unknown"; break;
-			}
-			M_Print(178, y, value);
-			break;
+                case HUD_SHOWCLOCK:
+                        text = LOC_GetString("$menu_show_clock_indented");
+                        switch ((int)scr_clock.value)
+                        {
+                        case 0: value = LOC_GetString("$menu_off"); break;
+                        case 1: value = LOC_GetString("$menu_level_time"); break;
+                        case 2: value = LOC_GetString("$menu_12hr_clock"); break;
+                        case 3: value = LOC_GetString("$menu_24hr_clock"); break;
+                        case 4: value = LOC_GetString("$menu_date_only"); break;
+                        case 5: value = LOC_GetString("$menu_date_12hr"); break;
+                        case 6: value = LOC_GetString("$menu_date_24hr"); break;
+                        case 7: value = LOC_GetString("$menu_score_12hr"); break;
+                        case 8: value = LOC_GetString("$menu_score_24hr"); break;
+                        default: value = LOC_GetString("$menu_unknown"); break;
+                        }
+                        M_Print(178, y, value);
+                        break;
 
-		case HUD_SHOWSPEED:
-			text = "        Show Speed";
-			switch ((int)scr_showspeed.value)
-			{
-			case 0: value = "off"; break;
-			case 1: value = "numbers"; break;
-			case 2: value = "visual meter"; break;
-			default: value = "unknown"; break;
-			}
-			M_Print(178, y, value);
-			break;
+                case HUD_SHOWSPEED:
+                        text = LOC_GetString("$menu_show_speed_indented");
+                        switch ((int)scr_showspeed.value)
+                        {
+                        case 0: value = LOC_GetString("$menu_off"); break;
+                        case 1: value = LOC_GetString("$menu_numbers"); break;
+                        case 2: value = LOC_GetString("$menu_visual_meter"); break;
+                        default: value = LOC_GetString("$menu_unknown"); break;
+                        }
+                        M_Print(178, y, value);
+                        break;
 
-		case HUD_SHOWSCORES:
-			text = "       Show Scores";
-			M_DrawCheckbox(178, y, scr_showscores.value);
-			break;
+                case HUD_SHOWSCORES:
+                        text = LOC_GetString("$menu_show_scores_indented");
+                        M_DrawCheckbox(178, y, scr_showscores.value);
+                        break;
 
 		case HUD_AUTOID:
-			text = "    Player Auto ID";
-			switch ((int)scr_autoid.value)
-			{
-			case 0: value = "off"; break;
-			case 1: value = "on"; break;
-			case 2: value = "on+prewar+pmode"; break;
-			default: value = "Unknown"; break;
-			}
-			M_Print(178, y, value);
-			break;
+                        text = LOC_GetString("$menu_player_auto_id_indented");
+                        switch ((int)scr_autoid.value)
+                        {
+                        case 0: value = LOC_GetString("$menu_off"); break;
+                        case 1: value = LOC_GetString("$menu_on"); break;
+                        case 2: value = LOC_GetString("$menu_on_prewar_pmode"); break;
+                        default: value = LOC_GetString("$menu_unknown"); break;
+                        }
+                        M_Print(178, y, value);
+                        break;
 
-		case HUD_MOVEKEYS:
-			text = "     Movement Keys";
-			M_DrawCheckbox(178, y, scr_movekeys.value);
-			break;
+                case HUD_MOVEKEYS:
+                        text = LOC_GetString("$menu_movement_keys_indented");
+                        M_DrawCheckbox(178, y, scr_movekeys.value);
+                        break;
 
-		case HUD_CONSOLEFONT:
-			text = " Console Font Size";
-			r = (scr_conscale.value - 1) / 5.0; // Scale to 1-6 range
-			M_DrawSlider(186, y, r, scr_conscale.value, "%.1f");
-			break;
+                case HUD_CONSOLEFONT:
+                        text = LOC_GetString("$menu_console_font_size_indented");
+                        r = (scr_conscale.value - 1) / 5.0;
+                        M_DrawSlider(186, y, r, scr_conscale.value, "%.1f");
+                        break;
 
 		case HUD_OBSITEMS:
 			text = "    Observer Items";
@@ -8313,61 +8316,60 @@ void M_Crosshair_Draw(void)
 	qpic_t* p;
 	float r;
 	enum crosshair_e i;
+	const char* title = LOC_GetString("$menu_options");
+        M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
-	p = Draw_CachePic("gfx/p_option.lmp");
-	M_DrawPic((320 - p->width) / 2, 4, p);
+        const char* title2 = LOC_GetString("$menu_crosshair_options");
+        M_PrintWhite((320 - 8 * strlen(title2)) / 2, 32, title2);
 
-	const char* title = "Crosshair Options";
-	M_PrintWhite((320 - 8 * strlen(title)) / 2, 32, title);
+        for (i = 0; i < CROSSHAIR_ITEMS; i++)
+        {
+                int y = 48 + 8 * i;
+                const char* text = NULL;
+                const char* value = NULL;
 
-	for (i = 0; i < CROSSHAIR_ITEMS; i++)
-	{
-		int y = 48 + 8 * i;
-		const char* text = NULL;
-		const char* value = NULL;
+                switch (i)
+                {
+                case CROSSHAIR_TOGGLE:
+                        text = LOC_GetString("$menu_crosshair_indented");
+                        if (crosshair.value == 0)
+                                value = LOC_GetString("$menu_off");
+                        else
+                                value = va(LOC_GetString("$menu_style_d"), (int)crosshair.value);
+                        M_Print(178, y, value);
+                        break;
+                case CROSSHAIR_ALPHA:
+                        text = LOC_GetString("$menu_alpha_indented");
+                        r = scr_crosshairalpha.value;
+                        M_DrawSlider(186, y, r, scr_crosshairalpha.value, "%.1f");
+                        break;
 
-		switch (i)
-		{
-		case CROSSHAIR_TOGGLE:
-			text = "       Crosshair";
-			if (crosshair.value == 0)
-				value = "Off";
-			else
-				value = va("Style %d", (int)crosshair.value);
-			M_Print(178, y, value);
-			break;
-		case CROSSHAIR_ALPHA:
-			text = "           Alpha";
-			r = scr_crosshairalpha.value;
-			M_DrawSlider(186, y, r, scr_crosshairalpha.value, "%.1f");
-			break;
+                case CROSSHAIR_COLOR:
+                        text = LOC_GetString("$menu_color_indented");
+                        if (crosshair_rgb_active)
+                        {
+                                value = va("%s", scr_crosshaircolor.string);
+                        }
+                        else
+                        {
+                                plcolour_t color = CL_PLColours_Parse(scr_crosshaircolor.string);
+                                if (color.type == 2)
+                                        value = va("%s", scr_crosshaircolor.string);
+                                else
+                                        value = va("%d", color.basic);
+                        }
+                        M_Print(178, y, value);
+                        break;
 
-		case CROSSHAIR_COLOR:
-			text = "           Color";
-			if (crosshair_rgb_active)
-			{
-				value = va("%s", scr_crosshaircolor.string);
-			}
-			else
-			{
-				plcolour_t color = CL_PLColours_Parse(scr_crosshaircolor.string);
-				if (color.type == 2)  // RGB color
-					value = va("%s", scr_crosshaircolor.string);
-				else  // Basic color
-					value = va("%d", color.basic);
-			}
-			M_Print(178, y, value);
-			break;
+                case CROSSHAIR_OUTLINE:
+                        text = LOC_GetString("$menu_outline_indented");
+                        M_DrawCheckbox(178, y, scr_crosshairoutline.value);
+                        break;
 
-		case CROSSHAIR_OUTLINE:
-			text = "         Outline";
-			M_DrawCheckbox(178, y, scr_crosshairoutline.value);
-			break;
-
-		case CROSSHAIR_SCALE:
-			text = "           Scale";
-			r = (scr_crosshairscale.value - 1.0f) / 9.0f;  // Map 1-10 to 0-1 for slider
-			M_DrawSlider(186, y, r, scr_crosshairscale.value, "%.1f");
+                case CROSSHAIR_SCALE:
+                        text = LOC_GetString("$menu_scale_indented");
+                        r = (scr_crosshairscale.value - 1.0f) / 9.0f;
+                        M_DrawSlider(186, y, r, scr_crosshairscale.value, "%.1f");
 			break;
 
 		case CROSSHAIR_X:
@@ -8423,8 +8425,7 @@ void M_Crosshair_Draw(void)
 	M_DrawCharacter(168, 48 + crosshair_cursor * 8, 12 + ((int)(realtime * 4) & 1));
 
 	if (crosshair_cursor == CROSSHAIR_COLOR)
-		M_PrintRGBA(74, 120, "+shift for RGB colors", CL_PLColours_Parse("0xffffff"), 0.6f, false);
-
+		M_PrintRGBA(74, 120, LOC_GetString("$menu_shift_for_rgb_colors"), CL_PLColours_Parse("0xffffff"), 0.6f, false);
 	// Draw search box if search is active
 	if (crosshairmenu.search.len > 0)
 	{
@@ -8747,52 +8748,52 @@ void M_Console_Draw(void)
 	float r;
 	enum console_e i;
 	const char* filter_text;
+	const char* title = LOC_GetString("$menu_options");
+        M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
-	p = Draw_CachePic("gfx/p_option.lmp");
-	M_DrawPic((320 - p->width) / 2, 4, p);
+        const char* title2 = LOC_GetString("$menu_console_options");
+        M_PrintWhite((320 - 8 * strlen(title2)) / 2, 32, title2);
 
-	const char* title = "Console Options";
-	M_PrintWhite((320 - 8 * strlen(title)) / 2, 32, title);
+        for (i = 0; i < CONSOLE_ITEMS; i++)
+        {
+                int y = 48 + 8 * i;
+                const char* text = NULL;
 
-	for (i = 0; i < CONSOLE_ITEMS; i++)
-	{
-		int y = 48 + 8 * i;
-		const char* text = NULL;
+                switch (i)
+                {
+                case CONSOLE_FONTSIZE:
+                        text = LOC_GetString("$menu_font_size_indented");
+                        r = (scr_conscale.value - 1) / 5;
+                        M_DrawSlider(186, y, r, scr_conscale.value, "%.0f");
+                        break;
 
-		switch (i)
-		{
-		case CONSOLE_FONTSIZE:
-			text = "       Font Size";
-			r = (scr_conscale.value - 1) / 5;
-			M_DrawSlider(186, y, r, scr_conscale.value, "%.0f");
-			break;
+                case CONSOLE_HEIGHT:
+                        text = LOC_GetString("$menu_height_indented");
+                        r = scr_consize.value;
+                        M_DrawSlider(186, y, r, scr_consize.value * 100, "%.0f%%");
+                        break;
 
-		case CONSOLE_HEIGHT:
-			text = "          Height";
-			r = scr_consize.value;
-			M_DrawSlider(186, y, r, scr_consize.value * 100, "%.0f%%");
-			break;
+                case CONSOLE_SPEED:
+                        text = LOC_GetString("$menu_speed_indented");
+                        r = (scr_conspeed.value - 100) / 9900;
+                        M_DrawSlider(186, y, r, scr_conspeed.value, "%.0f");
+                        break;
 
-		case CONSOLE_SPEED:
-			text = "           Speed";
-			r = (scr_conspeed.value - 100) / 9900;  // Simplified calculation
-			M_DrawSlider(186, y, r, scr_conspeed.value, "%.0f");
-			break;
+                case CONSOLE_TRANSPARENCY:
+                        text = LOC_GetString("$menu_transparency_indented");
+                        r = scr_conalpha.value;
+                        M_DrawSlider(186, y, r, scr_conalpha.value * 100, "%.0f%%");
 
-		case CONSOLE_TRANSPARENCY:
-			text = "    Transparency";
-			r = scr_conalpha.value;
-			M_DrawSlider(186, y, r, scr_conalpha.value * 100, "%.0f%%");
 			break;
 
 		case CONSOLE_CONTENTFILTER:
 			text = "  Content Filter";
 			switch ((int)cl_contentfilter.value)
 			{
-			case 0: filter_text = "off"; break;
-			case 1: filter_text = "partial"; break;
-			case 2: filter_text = "full"; break;
-			default: filter_text = "unknown"; break;
+			case 0: filter_text = LOC_GetString("$menu_off"); break;
+			case 1: filter_text = "Partial"; break;
+			case 2: filter_text = LOC_GetString("$m_full"); break;
+			default: filter_text = LOC_GetString("$menu_unknown"); break;
 			}
 			M_Print(180, y, filter_text);
 			break;
@@ -9268,127 +9269,126 @@ void M_Extras_Draw(void)
 {
 	qpic_t* p;
 	enum extras_e i;
+	const char* title = LOC_GetString("$menu_options");
+	const char* title2 = LOC_GetString("$menu_miscellaneous_options");
+        M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
+        M_PrintWhite((320 - 8 * strlen(title2)) / 2, 32, title2);
 
-	p = Draw_CachePic("gfx/p_option.lmp");
-	M_DrawPic((320 - p->width) / 2, 4, p);
+        for (i = 0; i < EXTRAS_ITEMS; i++)
+        {
+                int y = 48 + 8 * i;
+                const char* text = NULL;
+                const char* value = NULL;
 
-	const char* title = "Miscellaneous Options";
-	M_PrintWhite((320 - 8 * strlen(title)) / 2, 32, title);
+                switch (i)
+                {
+                case EXTRAS_YIELD:
+                        text = LOC_GetString("$menu_system_throttle_indented");
+                        if (fabs(sys_throttle.value - 0.02) < 0.001)
+                                value = LOC_GetString("$menu_on");
+                        else if (sys_throttle.value == 0)
+                                value = LOC_GetString("$menu_off");
+                        else if (sys_throttle.value < -0.9)
+                                value = LOC_GetString("$menu_off_when_minimized");
+                        else
+                                value = LOC_GetString("$menu_unknown");
+                        break;
 
-	for (i = 0; i < EXTRAS_ITEMS; i++)
-	{
-		int y = 48 + 8 * i;
-		const char* text = NULL;
-		const char* value = NULL;
+                case EXTRAS_DEMOREEL:
+                        text = LOC_GetString("$menu_start_demo_attract");
+                        if (cl_demoreel.value > 1)
+                                value = LOC_GetString("$menu_on");
+                        else if (cl_demoreel.value)
+                                value = LOC_GetString("$menu_startup_only");
+                        else
+                                value = LOC_GetString("$menu_off");
+                        break;
 
-		switch (i)
-		{
-		case EXTRAS_YIELD:
-			text = "   System Throttle";
-			if (fabs(sys_throttle.value - 0.02) < 0.001)
-				value = "on";
-			else if (sys_throttle.value == 0)
-				value = "off";
-			else if (sys_throttle.value < -0.9)
-				value = "off+when minimized";
-			else
-				value = "unknown";
-			break;
+                case EXTRAS_NETEXTENSIONS:
+                        text = LOC_GetString("$menu_protocol_exts_indented");
+                        value = cl_nopext.value ? LOC_GetString("$menu_blocked") : LOC_GetString("$menu_enabled");
+                        break;
 
-		case EXTRAS_DEMOREEL:
-			text = "Start Demo Attract";
-			if (cl_demoreel.value > 1)
-				value = "on";
-			else if (cl_demoreel.value)
-				value = "startup only";
-			else
-				value = "off";
-			break;
+                case EXTRAS_QCEXTENSIONS:
+                        text = LOC_GetString("$menu_qc_extensions_indented");
+                        value = pr_checkextension.value ? LOC_GetString("$menu_enabled") : LOC_GetString("$menu_blocked");
+                        break;
 
-		case EXTRAS_NETEXTENSIONS:
-			text = "     Protocol Exts";
-			value = cl_nopext.value ? "blocked" : "enabled";
-			break;
+                case EXTRAS_PREDICTION:
+                        text = LOC_GetString("$menu_prediction_indented");
+                        if (!cl_nopred.value && !sv_nqplayerphysics.value)
+                                value = LOC_GetString("$menu_on_override_ssqc");
+                        else if (!cl_nopred.value && sv_nqplayerphysics.value)
+                                value = LOC_GetString("$menu_on_compat_phys");
+                        else if (cl_nopred.value && !sv_nqplayerphysics.value)
+                                value = LOC_GetString("$menu_off_override_ssqc");
+                        else
+                                value = LOC_GetString("$menu_off");
+                        break;
 
-		case EXTRAS_QCEXTENSIONS:
-			text = "     QC Extensions";
-			value = pr_checkextension.value ? "enabled" : "blocked";
-			break;
+                case EXTRAS_AUTODEMO:
+                        text = LOC_GetString("$menu_auto_demo_indented");
+                        switch ((int)cl_autodemo.value)
+                        {
+                        case 0: value = LOC_GetString("$menu_off"); break;
+                        case 1: value = LOC_GetString("$menu_all_maps"); break;
+                        case 2: value = LOC_GetString("$menu_crx_matches_only"); break;
+                        case 3: value = LOC_GetString("$menu_all_maps_online"); break;
+                        case 4: value = LOC_GetString("$menu_all_maps_split"); break;
+                        default: value = LOC_GetString("$menu_unknown"); break;
+                        }
+                        break;
 
-		case EXTRAS_PREDICTION:
-			text = "        Prediction";
-			if (!cl_nopred.value && !sv_nqplayerphysics.value)
-				value = "on (override ssqc)";
-			else if (!cl_nopred.value && sv_nqplayerphysics.value)
-				value = "on (compat phys)";
-			else if (cl_nopred.value && !sv_nqplayerphysics.value)
-				value = "off (override ssqc)";
-			else
-				value = "off";
-			break;
+                case EXTRAS_SPAWNTRAINER:
+                        text = LOC_GetString("$menu_spawn_trainer_indented");
+                        value = cl_smartspawn.value ? LOC_GetString("$menu_on_jump_only") : LOC_GetString("$menu_off_jump_or_fire");
+                        break;
 
-		case EXTRAS_AUTODEMO:
-			text = "         Auto Demo";
-			switch ((int)cl_autodemo.value)
-			{
-			case 0: value = "off"; break;
-			case 1: value = "all maps"; break;
-			case 2: value = "crx matches only"; break;
-			case 3: value = "all maps (online)"; break;
-			case 4: value = "all maps (split)"; break;
-			default: value = "unknown"; break;
-			}
-			break;
+                case EXTRAS_ITEMBOB:
+                        text = LOC_GetString("$menu_q3_item_bobbing_indented");
+                        value = cl_bobbing.value ? LOC_GetString("$menu_on") : LOC_GetString("$menu_off");
+                        break;
 
-		case EXTRAS_SPAWNTRAINER:
-			text = "     Spawn Trainer";
-			value = cl_smartspawn.value ? "on (jump only)" : "off (jump or fire)";
-			break;
+                case EXTRAS_RESETCONFIG:
+                        text = LOC_GetString("$menu_reset_config_indented");
+                        value = LOC_GetString("$menu_confirm");
+                        break;
 
-		case EXTRAS_ITEMBOB:
-			text = "   Q3 Item Bobbing";
-			value = cl_bobbing.value ? "on" : "off";
-			break;
+                case EXTRAS_STARTUP:
+                        text = LOC_GetString("$menu_start_up_screen_indented");
+                        if (!strcmp(cl_onload.string, "") || !strcmp(cl_onload.string, "menu"))
+				        value = LOC_GetString("$menu_menu_default");
+                        else if (!strcmp(cl_onload.string, "browser"))
+                                value = LOC_GetString("$menu_server_browser");
+                        else if (!strcmp(cl_onload.string, "bookmarks"))
+                                value = LOC_GetString("$menu_bookmarks");
+                        else if (!strcmp(cl_onload.string, "save"))
+                                value = LOC_GetString("$menu_save_menu");
+                        else if (!strcmp(cl_onload.string, "history"))
+                                value = LOC_GetString("$menu_server_history");
+                        else if (!strcmp(cl_onload.string, "console"))
+                                value = LOC_GetString("$menu_console");
+                        else if (!strcmp(cl_onload.string, "demo"))
+                                value = LOC_GetString("$menu_demo_playback");
+                        else if (!strncmp(cl_onload.string, "connect ", 8))
+                                value = va(LOC_GetString("$menu_connect_colon_s"), cl_onload.string + 8);
+                        else if (!strncmp(cl_onload.string, "exec ", 5))
+                                value = va(LOC_GetString("$menu_exec_colon_s"), cl_onload.string + 5);
+                        else if (strchr(cl_onload.string, ' '))
+                                value = va(LOC_GetString("$menu_cmd_colon_s"), cl_onload.string);
+                        else
+                                value = cl_onload.string;
+                        break;
 
-		case EXTRAS_RESETCONFIG:
-			text = "      Reset Config";
-			value = "confirm";
-			break;
-
-		case EXTRAS_STARTUP:
-			text = "   Start-up Screen";
-			if (!strcmp(cl_onload.string, "") || !strcmp(cl_onload.string, "menu"))
-				value = "menu (default)";
-			else if (!strcmp(cl_onload.string, "browser"))
-				value = "server browser";
-			else if (!strcmp(cl_onload.string, "bookmarks"))
-				value = "bookmarks";
-			else if (!strcmp(cl_onload.string, "save"))
-				value = "save menu";
-			else if (!strcmp(cl_onload.string, "history"))
-				value = "server history";
-			else if (!strcmp(cl_onload.string, "console"))
-				value = "console";
-			else if (!strcmp(cl_onload.string, "demo"))
-				value = "demo playback";
-			else if (!strncmp(cl_onload.string, "connect ", 8))
-				value = va("connect: %s", cl_onload.string + 8);
-			else if (!strncmp(cl_onload.string, "exec ", 5))
-				value = va("exec: %s", cl_onload.string + 5);
-			else if (strchr(cl_onload.string, ' '))
-				value = va("cmd: %s", cl_onload.string);
-			else
-				value = cl_onload.string;
-			break;
 
 		case EXTRAS_PONG: // Added Quake Pong display
 			text = "        Quake Pong";
-			value = cl_pong.value ? "on" : "off";
+			value = cl_pong.value ? LOC_GetString("$menu_on") : LOC_GetString("$menu_off");
 			break;
 
 		case EXTRAS_HINTS: // Added Paused Hints display
 			text = "      Paused Hints";
-			value = scr_hints.value ? "on" : "off";
+			value = scr_hints.value ? LOC_GetString("$menu_on") : LOC_GetString("$menu_off");
 			break;
 
 		default:
@@ -11075,9 +11075,8 @@ void M_LanConfig_Draw (void)
 	//const char	*protocol;
 
 	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
-	p = Draw_CachePic ("gfx/p_multi.lmp");
-	basex = (320-p->width)/2;
-	M_DrawPic (basex, 4, p);
+	const char* title = LOC_GetString("$menu_multiplayer");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 
 	basex = 72; /* Arcane Dimensions has an oversized gfx/p_multi.lmp */
 
@@ -12564,9 +12563,8 @@ void M_GameOptions_Draw (void)
 	int y = 40;
 
 	M_DrawTransPic (16, 4, Draw_CachePic ("gfx/qplaque.lmp") );
-	p = Draw_CachePic ("gfx/p_multi.lmp");
-	M_DrawPic ( (320-p->width)/2, 4, p);
-
+	const char* title = LOC_GetString("$menu_multiplayer");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 	M_DrawTextBox (152, y-8, 10, 1);
 	M_Print (160, y, "begin game");
 	y+=16;
@@ -12929,8 +12927,8 @@ void M_Search_Draw (void)
 	qpic_t	*p;
 	int x;
 
-	p = Draw_CachePic ("gfx/p_multi.lmp");
-	M_DrawPic ( (320-p->width)/2, 4, p);
+	const char* title = LOC_GetString("$menu_multiplayer");
+	M_PrintWhite((320 - 8 * strlen(title)) / 2, 4, title);
 	x = (320/2) - ((12*8)/2) + 4;
 	M_DrawTextBox (x-8, 32, 12, 1);
 	M_Print (x, 40, "Searching...");
